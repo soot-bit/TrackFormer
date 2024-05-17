@@ -129,11 +129,11 @@ class EncoderBlock(nn.Module):
         # Attention layer
         self.self_attn = MultiheadAttention(input_dim, input_dim, num_heads)
 
-        # Two-layer MLP
+        # ff
         self.linear_net = nn.Sequential(
             nn.Linear(input_dim, dim_feedforward),
             nn.Dropout(dropout),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Linear(dim_feedforward, input_dim)
         )
 
@@ -143,12 +143,12 @@ class EncoderBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, mask=None):
-        # Attention part
+        # Attention 
         attn_out = self.self_attn(x, mask=mask)
         x = x + self.dropout(attn_out)
         x = self.norm1(x)
 
-        # MLP part
+        # FeedForward
         linear_out = self.linear_net(x)
         x = x + self.dropout(linear_out)
         x = self.norm2(x)

@@ -3,7 +3,7 @@ from torch import nn, optim
 from src.my_model.utils.modules import TransformerEncoder, PositionalEncoding, CosineWarmupScheduler
 import torch
 from torch.nn.functional import avg_pool1d, mse_loss
-
+from lightning.pytorch.callbacks import  Callback
 
 
 class RegressionTransformer(L.LightningModule):
@@ -31,7 +31,7 @@ class RegressionTransformer(L.LightningModule):
         self.input_net = nn.Sequential(
             nn.Dropout(self.hparams.input_dropout),
             nn.Linear(self.hparams.input_dim, self.hparams.model_dim),
-            nn.ReLU(),
+            nn.LeakyReLU(inplace=True),
             nn.Linear(self.hparams.model_dim, self.hparams.model_dim)
         )
 
@@ -46,24 +46,12 @@ class RegressionTransformer(L.LightningModule):
                                               dropout=self.hparams.dropout)
 
         # regression head
-               # Output classifier per sequence lement
-        self.output_net = nn.Sequential(
-            nn.Linear(self.hparams.model_dim, self.hparams.model_dim),
-            nn.LayerNorm(self.hparams.model_dim),
-            nn.ReLU(inplace=True),
-            nn.Dropout(self.hparams.dropout),
-            nn.Linear(self.hparams.model_dim, self.hparams.num_classes)
-        )
         self.regression_head = nn.Sequential(
-            nn.Linear(self.hparams.model_dim, self.hparams.model_dim),
-            nn.LayerNorm(self.hparams.model_dim),
-            nn.ReLU(inplace=True),
-            nn.Dropout(self.hparams.dropout),
             nn.Linear(self.hparams.model_dim, self.hparams.num_classes)
         )
 
 
-    def forward(self, x, mask=None, add_positional_encoding=1):
+    def forward(self, x, mask=None, add_positional_encoding=False):
         """
         Inputs:
             x - Input features [Batch, SeqLen, input_dim]
@@ -72,7 +60,9 @@ class RegressionTransformer(L.LightningModule):
         x = self.input_net(x)
         if add_positional_encoding:
             x = self.positional_encoding(x)
+        
         x = self.transformer(x, mask=mask)
+        x = x.mean(dim=1) 
         x = self.regression_head(x)
         return x
 
@@ -101,15 +91,12 @@ class RegressionTransformer(L.LightningModule):
     def _calculate_loss(self, batch, mode="train"):
 
 
-        inp_data, labels = batch
+        inputs, mask, label, _ = batch
+
+        preds = self(inputs, add_positional_encoding=False)
 
 
-        preds = self(inp_data, add_positional_encoding=True)
-
-
-        loss = mse_loss(preds.squeeze(), labels)
-
-        # Log
+        loss = mse_loss(preds.squeeze(), label)
         self.log(f"{mode}_loss", loss, on_step =True, prog_bar=True, logger=True )
         return loss
 
@@ -117,7 +104,9 @@ class RegressionTransformer(L.LightningModule):
         return self._calculate_loss(batch, mode="train")
 
     def validation_step(self, batch, batch_idx):
-        return self._calculate_loss(batch, mode="train")
+        _ = self._calculate_loss(batch, mode="val")
     
     def test_step(self, batch, batch_idx):
         _ = self._calculate_loss(batch, mode="test")
+
+
