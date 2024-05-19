@@ -8,7 +8,7 @@ from rich import print
 import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
-
+from rainbow_print import printr
 
 
             #################################
@@ -119,36 +119,38 @@ class TracksDatasetWrapper(Dataset):
             ##########################
 class TracksDataModule(L.LightningDataModule):
     def __init__(
-        self, 
-        dataset: Union[TracksDataset, TracksDatasetWrapper], 
-        batch_size: int = 32, 
-        num_workers: int = 4, 
+        self,
+        use_tracks_dataset: bool = True,
+        batch_size: int = 32,
+        num_workers: int = 4,
         persistence: bool = True
     ):
         super().__init__()
-        self.dataset = dataset()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.persistence = persistence
 
+        if use_tracks_dataset:
+            self.dataset = TracksDataset()
+        else:
+            self.dataset = TracksDatasetWrapper()
 
     def setup(self, stage=None):
         if isinstance(self.dataset, TracksDatasetWrapper):
-            print("TracksDatasetWrapper")
+            printr(f"**Using TracksDatasetWrapper size of dataset{len(self.dataset)}**")
             train_len = int(len(self.dataset) * 0.6)
-            val_len = int(len(self.dataset) * .2)
+            val_len = int(len(self.dataset) * 0.2)
             test_len = len(self.dataset) - train_len - val_len
             self.train_dataset, self.val_dataset, self.test_dataset = random_split(
                 self.dataset, [train_len, val_len, test_len]
             )
-
         elif isinstance(self.dataset, TracksDataset):
-            print("TracksDataset")
+            printr("**Using infinate TracksDataset***")
             self.train_dataset = self.dataset
             self.val_dataset = self.dataset
             self.test_dataset = self.dataset
         else:
-            print("Unknown dataset type:", type(self.dataset))  # just uncase 
+            printr("Unknown dataset type:", type(self.dataset))
 
     def train_dataloader(self):
         return DataLoader(
@@ -156,7 +158,7 @@ class TracksDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
-            persistent_workers= self.persistence
+            persistent_workers=self.persistence
         )
 
     def val_dataloader(self):
@@ -165,7 +167,7 @@ class TracksDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
-             persistent_workers= self.persistence
+            persistent_workers=self.persistence
         )
 
     def test_dataloader(self):
@@ -174,7 +176,7 @@ class TracksDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
-            persistent_workers= self.persistence
+            persistent_workers=self.persistence
         )
 
     @staticmethod

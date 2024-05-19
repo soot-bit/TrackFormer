@@ -69,8 +69,7 @@ class RegressionTransformer(L.LightningModule):
     @torch.no_grad()
     def get_attention_maps(self, x, mask=None, add_positional_encoding=True):
         """
-        Function for extracting the attention matrices of the whole Transformer for a single batch.
-        Input arguments same as the forward pass.
+        Function for extracting the attention matrices
         """
         x = self.input_net(x)
         if add_positional_encoding:
@@ -90,12 +89,9 @@ class RegressionTransformer(L.LightningModule):
     
     def _calculate_loss(self, batch, mode="train"):
 
-
         inputs, mask, label, _ = batch
 
         preds = self(inputs, add_positional_encoding=False)
-
-
         loss = mse_loss(preds.squeeze(), label)
         self.log(f"{mode}_loss", loss, on_step =True, prog_bar=True, logger=True )
         return loss
