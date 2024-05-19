@@ -93,7 +93,7 @@ class RegressionTransformer(L.LightningModule):
 
         preds = self(inputs, add_positional_encoding=False)
         loss = mse_loss(preds.squeeze(), label)
-        self.log(f"{mode}_loss", loss, on_step =True, prog_bar=True, logger=True )
+        self.log(f"{mode}_loss", loss, prog_bar=True, logger=True )
         return loss
 
     def training_step(self, batch, batch_idx):

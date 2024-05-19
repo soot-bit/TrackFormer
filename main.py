@@ -7,7 +7,7 @@ import argparse
 
 def train_transformer(data_module, **kwargs):
     """Train the transformer model."""
-    model = RegressionTransformer(max_iters=50 * 32, **kwargs)
+    model = RegressionTransformer(max_iters=100 * 32, **kwargs)
 
     # Configure Trainer
     trainer = L.Trainer(
@@ -15,8 +15,8 @@ def train_transformer(data_module, **kwargs):
         limit_test_batches=100,
         limit_val_batches=5,
         min_steps=2,
-        log_every_n_steps=1,
-        max_epochs=10,
+        log_every_n_steps=10,
+        max_epochs=200,
         logger=logger,
         callbacks=callbacks_list,
     )
@@ -29,7 +29,7 @@ def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description='Train a transformer model for track fitting', allow_abbrev=False)
     parser.add_argument('--input_dim', type=int, default=2, help='Input dimension')
-    parser.add_argument('--model_dim', type=int, default=248, help='Model dimension')
+    parser.add_argument('--model_dim', type=int, default=512, help='Model dimension')
     parser.add_argument('--num_heads', type=int, default=8, help='Number of attention heads')
     parser.add_argument('--num_classes', type=int, default=1, help='Number of output classes')
     parser.add_argument('--num_layers', type=int, default=6, help='Number of transformer layers')
@@ -60,6 +60,7 @@ def main():
         lr=args.lr,
         warmup=args.warmup
     )
+
 
     test_results = trainer.test(model, data_module, verbose=1)
 if __name__ == '__main__':
