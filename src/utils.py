@@ -70,4 +70,4 @@ hyper = ParmSummary()
 lr_monitor = LearningRateMonitor(logging_interval="epoch")
 logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name="toytrack_Transformer")
 early_stopping = OverfittingEarlyStopping(verbose=True)
-callbacks_list = [checkpoint_callback, timer, hyper, lr_monitor, summary, early_stopping]
+callbacks_list = [checkpoint_callback, timer, hyper, lr_monitor, summary]
