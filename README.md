@@ -1,4 +1,4 @@
-# TrackFitting: Particle Trajectory Reconstruction with Transformer Networks
+# TrackFitting: Particle Trackfitting with Transformer 
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.7%2B-green.svg)](https://www.python.org/)
