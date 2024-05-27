@@ -104,5 +104,10 @@ class RegressionTransformer(L.LightningModule):
     
     def test_step(self, batch, batch_idx):
         _ = self._calculate_loss(batch, mode="test")
+    
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        inputs, mask, label, _ = batch
+        preds = self(inputs, add_positional_encoding=False)
+        return preds
 
 

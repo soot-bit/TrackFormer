@@ -140,7 +140,7 @@ class TracksDataModule(L.LightningDataModule):
 
     def setup(self, stage=None):
         if isinstance(self.dataset, TracksDatasetWrapper):
-            printr(f"**Using TracksDatasetWrapper size of dataset{len(self.dataset)}**")
+            printr(f"**Using TracksDatasetWrapper size: {len(self.dataset)}**")
             train_len = int(len(self.dataset) * 0.6)
             val_len = int(len(self.dataset) * 0.2)
             test_len = len(self.dataset) - train_len - val_len
