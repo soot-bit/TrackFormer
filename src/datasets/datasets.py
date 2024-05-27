@@ -125,8 +125,10 @@ class TracksDataModule(L.LightningDataModule):
         self,
         use_tracks_dataset: bool = True,
         batch_size: int = 20,
+        wrapper_size:int = 200,
         num_workers: int = 0,
         persistence: bool = False
+
     ):
         super().__init__()
         self.batch_size = batch_size
@@ -136,11 +138,12 @@ class TracksDataModule(L.LightningDataModule):
         if use_tracks_dataset:
             self.dataset = TracksDataset()
         else:
-            self.dataset = TracksDatasetWrapper()
+            self.dataset = TracksDatasetWrapper(wrapper_size)
+
 
     def setup(self, stage=None):
         if isinstance(self.dataset, TracksDatasetWrapper):
-            printr(f"**Using TracksDatasetWrapper size: {len(self.dataset)}**")
+            printr(f"**Using TracksDatasetWrapper size:: {len(self.dataset)}**")
             train_len = int(len(self.dataset) * 0.6)
             val_len = int(len(self.dataset) * 0.2)
             test_len = len(self.dataset) - train_len - val_len
@@ -148,7 +151,7 @@ class TracksDataModule(L.LightningDataModule):
                 self.dataset, [train_len, val_len, test_len]
             )
         elif isinstance(self.dataset, TracksDataset):
-            printr("**Using infinate TracksDataset***")
+            printr("**Using infinite TracksDataset***")
             self.train_dataset = self.dataset
             self.val_dataset = self.dataset
             self.test_dataset = self.dataset
