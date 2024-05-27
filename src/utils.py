@@ -3,7 +3,9 @@ from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Ea
 from lightning.pytorch.loggers import TensorBoardLogger
 from rich.console import Console
 from rich.table import Table
+from rich import print
 from rainbow_print import printr
+import datetime
 
 
 
@@ -71,3 +73,16 @@ lr_monitor = LearningRateMonitor(logging_interval="epoch")
 logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name="toytrack_Transformer")
 early_stopping = OverfittingEarlyStopping(verbose=True)
 callbacks_list = [checkpoint_callback, timer, hyper, lr_monitor, summary]
+
+def read_time():
+    sec = timer.time_elapsed("train")
+    td = datetime.timedelta(seconds=sec)
+    total_seconds = td.total_seconds()
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, remainder = divmod(remainder, 60)
+    seconds, milliseconds = divmod(remainder, 1)
+    
+    # Format time 
+    hmsms = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}.{int(milliseconds * 1000):03}"
+    print(f"Training time: {hmsms}")
+

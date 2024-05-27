@@ -1,7 +1,7 @@
 import lightning as L
 from src.datasets.datasets import TracksDataModule
 from src.my_model.transformer import RegressionTransformer
-from src.utils import callbacks_list, logger
+from src.utils import callbacks_list, logger, read_time
 import argparse
 import click
 
@@ -26,7 +26,7 @@ def train_transformer(data_module, epochs, train_batches, **kwargs):
         callbacks=callbacks_list,
     )
 
-    trainer.fit(model, data_module)
+    trainer.fit(model, data_module, ckpt_path="last")
     return trainer, model
 
 @click.command()
@@ -39,12 +39,12 @@ def train_transformer(data_module, epochs, train_batches, **kwargs):
 @click.option('--epochs', type=int, default=100, help='Maximum number of epochs to train')
 @click.option('--train_batches', type=int, default=500, help='Limit on the number of training batches per epoch')
 def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches):
-    """Main function."""
+    """Main function"""
     # DataModule
     data_module = TracksDataModule()
 
     # Train the model
-    trainer, model = train_transformer(
+    trainer, _ = train_transformer(
         data_module,
         epochs=epochs,
         train_batches=train_batches,
@@ -57,9 +57,9 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         lr=lr,
         warmup=warmup
     )
-
-    test_results = trainer.test(model, data_module, verbose=1)
-    print(test_results)
+    #test on best model
+    test_results = trainer.test(datamodule=data_module, ckpt_path="best", verbose=1)
+    read_time()
 
 if __name__ == '__main__':
     main()

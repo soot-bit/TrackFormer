@@ -1,5 +1,4 @@
 from typing import Optional, Union, List
-from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 from torch.utils.data import TensorDataset, Subset, random_split, DataLoader, Dataset, IterableDataset
 import torch
@@ -9,6 +8,10 @@ import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from rainbow_print import printr
+import multiprocessing as mp
+
+
+
 
 
             #################################
@@ -54,7 +57,7 @@ class _TrackIterable:
             d0: Optional[float] = 0.1,
             noise: Optional[Union[float, List[float], List[Union[float, str]]]] = 0,
             lambda_: Optional[float] = 50,
-            pt_dist: Optional[Union[float, List[float], List[Union[float, str]]]] = [1, 5],
+            pt_dist: Optional[Union[float, List[float], List[Union[float, str]]]] = [1, 10],
             warmup_t0: Optional[float] = 0
         ):
 
@@ -93,8 +96,8 @@ class TracksDatasetWrapper(Dataset):
     """ Generates and stores track data  
         ---------------------------------
     """ 
-    def __init__(self, tracks_dataset: TracksDataset, num_events: int = 200):
-        self.tracks_dataset = tracks_dataset()
+    def __init__(self, num_events: int = 200):
+        self.tracks_dataset = TracksDataset()
         self.num_events = num_events
         self.events = []
 
@@ -121,9 +124,9 @@ class TracksDataModule(L.LightningDataModule):
     def __init__(
         self,
         use_tracks_dataset: bool = True,
-        batch_size: int = 32,
-        num_workers: int = 4,
-        persistence: bool = True
+        batch_size: int = 20,
+        num_workers: int = 0,
+        persistence: bool = False
     ):
         super().__init__()
         self.batch_size = batch_size
@@ -174,8 +177,8 @@ class TracksDataModule(L.LightningDataModule):
         return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
-            num_workers=self.num_workers,
             collate_fn=self.collate_fn,
+            num_workers=self.num_workers,
             persistent_workers=self.persistence
         )
 
