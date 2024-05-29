@@ -8,12 +8,28 @@ import numpy as np
 
 #helper  functions
 def expand_mask(mask):
-    assert mask.ndim >= 2, "Mask must be at least 2-dimensional with seq_length x seq_length"
-    if mask.ndim == 3:
-        mask = mask.unsqueeze(1)
-    while mask.ndim < 4:
-        mask = mask.unsqueeze(0)
-    return mask
+    """
+    Expand the mask tensor to match the dimensions required for masking in MultiheadAttention.
+
+    Args:
+        mask (torch.Tensor): Mask tensor with shape (batch_size, seq_length) 
+
+    Returns:
+        torch.Tensor: Expanded mask tensor with shape (batch_size, num_heads, seq_length, seq_length).
+    """
+
+    assert mask.ndim >= 2, "Mask shape is wrong"
+    
+    if mask.ndim == 2:
+        # If mask is 2D, broadcast it over batch size and number of heads
+        mask = mask.unsqueeze(1)  # Add num_heads dimension
+        mask = mask.unsqueeze(1)  # Add seq_length dimension
+    
+    elif mask.ndim == 3:
+        # If mask is 3D, broadcast it over number of heads
+        mask = mask.unsqueeze(1)  # Add seq_length dimension
+    
+    return mask.expand(-1, -1, mask.size(-1), mask.size(-1))
 
 
 
