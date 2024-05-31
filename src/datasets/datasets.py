@@ -8,7 +8,7 @@ import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from rainbow_print import printr
-import multiprocessing as mp
+
 
 
 
@@ -190,3 +190,23 @@ class TracksDataModule(L.LightningDataModule):
         """Batch maker"""
         x, mask, pt, events = zip(*ls)
         return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze(), list(events)
+    
+    
+    # @staticmethod
+    # def TMLcollate_fn(batch):
+
+    #     inputs, masks, targets = zip(*batch)
+
+    #     # Pad the inputs and create a new mask
+    #     packed_inputs = pad_sequence(inputs, batch_first=True)
+    #     packed_masks = pad_sequence(masks, batch_first=True)
+
+    #     return packed_inputs, packed_masks, torch.stack(targets, dim=0)
+
+
+
+
+
+
+
+

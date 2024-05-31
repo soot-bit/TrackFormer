@@ -91,7 +91,7 @@ class RegressionTransformer(L.LightningModule):
 
         inputs, mask, label, _ = batch
 
-        preds = self(inputs, mask=mask, add_positional_encoding=False)
+        preds = self(inputs, mask=mask, add_positional_encoding=True)
         loss = mse_loss(preds.squeeze(), label)
 
         self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
@@ -106,9 +106,4 @@ class RegressionTransformer(L.LightningModule):
     def test_step(self, batch, batch_idx):
         _ = self._calculate_loss(batch, mode="test")
     
-    def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        inputs, mask, label, _ = batch
-        preds = self(inputs, add_positional_encoding=False)
-        return preds
-
 
