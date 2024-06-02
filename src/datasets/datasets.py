@@ -135,6 +135,8 @@ class TracksDataModule(L.LightningDataModule):
         self.num_workers = num_workers
         self.persistence = persistence
 
+        self.persistence = persistence if num_workers == 0 else True
+
         if use_tracks_dataset:
             self.dataset = TracksDataset()
         else:
