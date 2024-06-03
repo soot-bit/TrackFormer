@@ -32,7 +32,7 @@ class ParmSummary(Callback):
 class OverfittingEarlyStopping(EarlyStopping):
     """Early stopping to prevent overfiting"""
     
-    def __init__(self, monitor='val_loss', patience=6, min_delta=0.0001, verbose=True, mode='min'):
+    def __init__(self, monitor='val_loss', patience=15, min_delta=0.0001, verbose=True, mode='min'):
         super().__init__(monitor=monitor, patience=patience, min_delta=min_delta, verbose=verbose, mode=mode)
         self.last_loss = float('inf')
         self.increase_count = 0
@@ -54,35 +54,36 @@ class OverfittingEarlyStopping(EarlyStopping):
             self.increase_count = 0
             super().on_validation_end(trainer, pl_module)
 
+def experiment_name(exp):
+    ckp = ModelCheckpoint(
+                dirpath=f"/content/aims_proj/saved_models/{exp}",
+                filename="best_model",
+                save_top_k=1,
+                verbose=True,
+                monitor="val_loss",
+                mode="min"
+                )
+    logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name=f"{exp}")
+    return [ckp] , logger
 
-checkpoint_callback = ModelCheckpoint(
-    dirpath="/content/aims_proj/saved_models/toytrack_Transformer",
-    filename="best_model",
-    save_top_k=1,
-    verbose=False,
-    monitor="val_loss",
-    mode="min"
-    )
-
-
-summary = RichModelSummary()
 timer = Timer()
-bar = RichProgressBar()
-hyper = ParmSummary()
-lr_monitor = LearningRateMonitor(logging_interval="epoch")
-logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name="toytrack_Transformer")
-early_stopping = OverfittingEarlyStopping(verbose=True)
-callbacks_list = [checkpoint_callback, timer, hyper, lr_monitor, summary]
 
 def read_time():
     sec = timer.time_elapsed("train")
     td = datetime.timedelta(seconds=sec)
     total_seconds = td.total_seconds()
     hours, remainder = divmod(total_seconds, 3600)
+
     minutes, remainder = divmod(remainder, 60)
     seconds, milliseconds = divmod(remainder, 1)
-    
     # Format time 
     hmsms = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}.{int(milliseconds * 1000):03}"
     print(f"Training time: {hmsms}")
-
+    
+summary = RichModelSummary()
+bar = RichProgressBar()
+hyper = ParmSummary()
+lr_monitor = LearningRateMonitor(logging_interval="epoch")
+# logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name="toytrack_Transformer")
+early_stopping = OverfittingEarlyStopping(verbose=True)
+callbacks_list = [ timer, hyper, lr_monitor, summary]

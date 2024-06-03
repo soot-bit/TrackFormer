@@ -91,8 +91,8 @@ class RegressionTransformer(L.LightningModule):
 
         inputs, mask, label, _ = batch
 
-        preds = self(inputs, mask=mask, add_positional_encoding=True)
-        loss = mse_loss(preds.squeeze(), label)
+        preds = self(inputs, add_positional_encoding=False)
+        loss = mse_loss(preds.squeeze(), label.squeeze())
 
         self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
         return loss

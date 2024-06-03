@@ -12,18 +12,18 @@ def expand_mask(mask):
     Expand the mask tensor to match the dimensions required for masking in MultiheadAttention.
 
     Args:
-        mask (torch.Tensor): Mask tensor with shape (batch_size, seq_length) 
+       Mask tensor with shape (batch_size, seq_length) 
 
     Returns:
-        torch.Tensor: Expanded mask tensor with shape (batch_size, num_heads, seq_length, seq_length).
+        Expanded mask tensor with shape (batch_size, num_heads, seq_length, seq_length).
     """
 
     assert mask.ndim >= 2, "Mask shape is wrong"
     
     if mask.ndim == 2:
         # If mask is 2D, broadcast it over batch size and number of heads
-        mask = mask.unsqueeze(1)  # Add num_heads dimension
-        mask = mask.unsqueeze(1)  # Add seq_length dimension
+        mask = mask.unsqueeze(1) 
+        mask = mask.unsqueeze(1) 
     
     elif mask.ndim == 3:
         # If mask is 3D, broadcast it over number of heads

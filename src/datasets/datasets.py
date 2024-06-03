@@ -8,7 +8,11 @@ import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from rainbow_print import printr
-
+import os
+import shutil
+import math
+from trackml.dataset import load_dataset, load_event
+import pandas as pd
 
 
 
@@ -117,24 +121,22 @@ class TracksDatasetWrapper(Dataset):
            
            
            
-            ##########################
-            # Lightning Data Module  #
-            ##########################
-class TracksDataModule(L.LightningDataModule):
+            ###################################
+            # ToyTrack Lightning Data Module  #
+            ###################################
+class ToyTrackDataModule(L.LightningDataModule):
     def __init__(
         self,
         use_tracks_dataset: bool = True,
         batch_size: int = 20,
         wrapper_size:int = 200,
-        num_workers: int = 0,
+        num_workers: int = 10,
         persistence: bool = False
 
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.persistence = persistence
-
         self.persistence = persistence if num_workers == 0 else True
 
         if use_tracks_dataset:
@@ -194,20 +196,158 @@ class TracksDataModule(L.LightningDataModule):
         return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze(), list(events)
     
     
-    # @staticmethod
-    # def TMLcollate_fn(batch):
-
-    #     inputs, masks, targets = zip(*batch)
-
-    #     # Pad the inputs and create a new mask
-    #     packed_inputs = pad_sequence(inputs, batch_first=True)
-    #     packed_masks = pad_sequence(masks, batch_first=True)
-
-    #     return packed_inputs, packed_masks, torch.stack(targets, dim=0)
 
 
+class TrackMLIterableDataset2(IterableDataset):
+    def __init__(self, data_path, tolerance=0.01):
+        self.data_path = data_path
+        self.tolerance = tolerance
+        self.start, self.end = self._event_range()
+
+    def _event_range(self):
+        files = os.listdir(self.data_path)
+        files.sort()
+        if files:
+            return int(files[0].split('-')[0][5:]), int(files[-1].split('-')[0][5:]) + 1
+        else:
+            raise FileNotFoundError("Uh-oh!, looks like the files are on vacation...")
+
+    def _conformal_mapping(self, x, y, z):
+        r = x**2 + y**2
+        u = x / r
+        v = y / r
+        pp, vv = np.polyfit(u, v, 2, cov=True)
+        b = 0.5 / pp[2]
+        a = -pp[1] * b
+        R = np.sqrt(a**2 + b**2)
+
+        magnetic_field = 2.0
+        pT = 0.3 * magnetic_field * R  # in MeV
+
+        return pT / 1_000
+
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is None:  # single-process data loading,
+            iter_start = self.start
+            iter_end = self.end
+        else:
+            # split workload
+            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
+            worker_id = worker_info.id
+            iter_start = self.start + worker_id * per_worker
+            iter_end = min(iter_start + per_worker, self.end)
+
+        for i in range(iter_start, iter_end):
+            event = f'event00000{i:02d}'
+
+            path = os.path.join(self.data_path, event)
+
+            hits, cells, particles, truth = load_event(path)
+            particles = particles[particles['nhits'] >= 5]
+            merged_df = pd.merge(truth, particles, on='particle_id')
+            merged_df = pd.merge(merged_df, hits, on='hit_id')
+
+            merged_df['pT'] = np.sqrt(merged_df['px']**2 + merged_df['py']**2)
+
+            grouped = merged_df.groupby('particle_id')
+
+            for particle_id, group in grouped:
+                inputs = group[['tx', 'ty', 'tz']].values
+                target = group[['pT', 'pz']].values[0]
+
+                zxy = torch.tensor(inputs, dtype=torch.float32)
+                target_tensor = torch.tensor(target, dtype=torch.float32)
+
+                x, y, z = zxy[:, 0], zxy[:, 1], zxy[:, 2]
+                conf_pt = self._conformal_mapping(x, y, z)
 
 
+                error = abs(conf_pt - target_tensor[0].item())
+                if error < self.tolerance:
+                    mask = torch.ones(zxy.shape[0], dtype=torch.bool)
+                    yield (zxy, mask, target_tensor)
+
+
+class TrackMLDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        batch_size: int = 20,
+        num_workers: int = 0,
+        persistence: bool = False,
+        data_path: str = "/content/track-fitter/src/datasets",
+        ram_path: str = "/dev/shm/MyData",
+        use_ram = False
+
+    ):
+        super().__init__()
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.persistence = persistence if num_workers == 0 else True
+        self.data_path = data_path
+        self.ram_path = ram_path
+        self.use_ram = use_ram
+        
+        
+        self._to_ram() if  self.use_ram else None
+
+
+    def _to_ram(self):
+        try:
+            shutil.copytree(self.data_path, self.ram_path)
+            print("Data copied successfully to RAM...")
+        except Exception as e:
+            if "File exists:" in str(e):
+                pass
+            else:
+                raise RuntimeError (f"Ohh my: {e}")
+
+
+
+    def setup(self, stage=None):
+        printr("***Using TrackML Dataset****")
+        data_path = self.ram_path if self.use_ram else self.data_path
+        self.train_dataset = TrackMLIterableDataset2(os.path.join(data_path, "train"))
+        self.val_dataset = TrackMLIterableDataset2(os.path.join(data_path, "val"))
+        self.test_dataset = TrackMLIterableDataset2(os.path.join(data_path, "test"))
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self.TMLcollate_fn,
+            persistent_workers=self.persistence
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self.TMLcollate_fn,
+            persistent_workers=self.persistence
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            collate_fn=self.TMLcollate_fn,
+            num_workers=self.num_workers,
+            persistent_workers=self.persistence
+        )
+
+
+
+    @staticmethod
+    def TMLcollate_fn(batch):
+        inputs, masks, targets = zip(*batch)
+
+        inputs = pad_sequence(inputs, batch_first=True)
+        masks = pad_sequence(masks, batch_first=True, padding_value=0)
+
+        return inputs, masks, torch.stack(targets, dim=0), None
 
 
 
