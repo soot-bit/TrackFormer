@@ -1,3 +1,6 @@
 saved_models
 lightning_logs
-
+/src/datasets/TML_datafiles/test/
+/src/datasets/TML_datafiles/train/
+/src/datasets/TML_datafiles/val/
+/src/datasets/TML_datafiles/data_list.pt

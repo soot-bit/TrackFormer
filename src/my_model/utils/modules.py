@@ -219,6 +219,23 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, : x.size(1)]
         return x
 
+
+def quantile_loss(outputs, targets, quantile=0.5):
+    """
+    Compute the Quantile Loss for the given outputs and targets.
+    
+    Args:
+        outputs (torch.Tensor): The model's predictions.
+        targets (torch.Tensor): The ground truth targets.
+        quantile (float): The desired quantile to optimize for (between 0 and 1).
+    
+    Returns:
+        torch.Tensor: The Quantile Loss.
+    """
+    errors = targets - outputs
+    loss = torch.max(quantile * errors, (quantile - 1) * errors)
+    return torch.mean(loss)
+
 class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
 
     def __init__(self, optimizer, warmup, max_iters):

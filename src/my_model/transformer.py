@@ -1,6 +1,6 @@
 import lightning as L
 from torch import nn, optim
-from src.my_model.utils.modules import TransformerEncoder, PositionalEncoding, CosineWarmupScheduler
+from src.my_model.utils.modules import TransformerEncoder, PositionalEncoding, CosineWarmupScheduler, quantile_loss
 import torch
 from torch.nn.functional import avg_pool1d, mse_loss
 from lightning.pytorch.callbacks import  Callback
@@ -51,7 +51,7 @@ class RegressionTransformer(L.LightningModule):
         )
 
 
-    def forward(self, x, mask=None, add_positional_encoding=False):
+    def forward(self, x, mask=None, add_positional_encoding=True):
         """
         Inputs:
             x - Input features [Batch, SeqLen, input_dim]
@@ -92,7 +92,7 @@ class RegressionTransformer(L.LightningModule):
         inputs, mask, label, _ = batch
 
         preds = self(inputs, add_positional_encoding=False)
-        loss = mse_loss(preds.squeeze(), label.squeeze())
+        loss = quantile_loss(preds.squeeze(), label.squeeze())
 
         self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
         return loss

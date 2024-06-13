@@ -213,9 +213,13 @@ class TrackMLIterableDataset2(IterableDataset):
             raise FileNotFoundError("Uh-oh!, looks like the files are on vacation...")
 
     def _conformal_mapping(self, x, y, z):
+
         r = x**2 + y**2
+
         u = x / r
         v = y / r
+
+
         pp, vv = np.polyfit(u, v, 2, cov=True)
         b = 0.5 / pp[2]
         a = -pp[1] * b
@@ -225,6 +229,7 @@ class TrackMLIterableDataset2(IterableDataset):
         pT = 0.3 * magnetic_field * R  # in MeV
 
         return pT / 1_000
+
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -244,7 +249,7 @@ class TrackMLIterableDataset2(IterableDataset):
             path = os.path.join(self.data_path, event)
 
             hits, cells, particles, truth = load_event(path)
-            particles = particles[particles['nhits'] >= 5]
+            particles = particles[particles['nhits'] >= 6]
             merged_df = pd.merge(truth, particles, on='particle_id')
             merged_df = pd.merge(merged_df, hits, on='hit_id')
 
@@ -349,6 +354,58 @@ class TrackMLDataModule(L.LightningDataModule):
 
         return inputs, masks, torch.stack(targets, dim=0), None
 
+
+
+###################:
+class TrackMLGPU(Dataset):
+    def __init__(self, data_path):
+        super().__init__()
+        self.data = torch.load(data_path)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
+
+class TML_RAM_DataModule(L.LightningDataModule):
+    def __init__(self, data_path, batch_size=2_000, num_workers=16, pin_memory=False):
+        super().__init__()
+        self.data_path = data_path
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.pin_memory = pin_memory
+        self.dataset = None
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
+
+    @staticmethod
+    def TMLcollate_fn(batch):
+        inputs, targets = zip(*batch)
+        
+        inputs = pad_sequence(inputs, batch_first=True)
+        targets = torch.stack(targets, dim=0)
+
+        return inputs, None, targets, None
+
+    def setup(self, stage=None):
+        printr("***Using TrackML shared memory Dataset****")
+        dataset = TrackMLGPU(self.data_path)
+        train_size = int(0.7 * len(dataset))
+        val_size = int(0.1 * len(dataset))
+        test_size = len(dataset) - train_size - val_size
+
+        self.train_dataset, self.val_dataset, self.test_dataset = random_split(dataset, [train_size, val_size, test_size])
+
+    def train_dataloader(self):
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+
+    def val_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+
+    def test_dataloader(self):
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
 
 
 

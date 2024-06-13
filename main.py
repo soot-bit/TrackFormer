@@ -1,5 +1,5 @@
 import lightning as L
-from src.datasets.datasets import ToyTrackDataModule, TrackMLDataModule
+from src.datasets.datasets import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
 from src.my_model.transformer import RegressionTransformer
 from src.utils import callbacks_list, read_time, experiment_name
 import argparse
@@ -14,7 +14,7 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
     
 
     if train_batches is None:
-        max_iters = epochs * 2_000
+        max_iters = epochs * 900
         test_batches = None
         val_batches = None
     else: 
@@ -32,7 +32,7 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
         limit_train_batches=train_batches,
         limit_val_batches=val_batches,
         limit_test_batches=test_batches,
-        log_every_n_steps=50,
+        log_every_n_steps=100,
         max_epochs=epochs,
         logger=logger,
         callbacks=ckpts,
@@ -51,9 +51,9 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
 @click.option('--epochs', type=int, default=100, help='Maximum number of epochs to train')
 @click.option('--train_batches', type=int, default=100, help='Limit on the number of training batches per epoch')
 @click.option('--exp_name', type=str, required=True, help='Name the experiment') 
-@click.option('--data_module', type=click.Choice(['ToyTrack', 'TrackML']), help='Choose the dataset..')
-@click.option('--num_workers', type=int, default=17, help='Number of workers for data loading')
-@click.option('--batch_size', type=int, default=40, help='Batch size for training')
+@click.option('--data_module', type=click.Choice(['ToyTrack', 'TrackML', "TML_RAM"]), help='Choose the dataset..')
+@click.option('--num_workers', type=int, default=15, help='Number of workers for data loading')
+@click.option('--batch_size', type=int, default=20, help='Batch size for training')
 def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, data_module, num_workers, batch_size):
     """Main function"""
 
@@ -70,6 +70,9 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
     elif data_module == 'ToyTrack':
         data_module = ToyTrackDataModule(num_workers=num_workers, batch_size=batch_size)
         num_classes, input_dim,  = 1, 2
+    elif data_module == "TML_RAM":
+        data_module = TML_RAM_DataModule(data_path = "/content/TrackML_data/data_list_no_conformal.pt", num_workers=num_workers, batch_size=batch_size)
+        num_classes, input_dim, train_batches  = 2, 3, None
         
 
     # Train the model
