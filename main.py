@@ -63,7 +63,7 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
 
 
 
-    # DataModule
+    # DataModules
     if data_module == 'TrackML':
         data_module = TrackMLDataModule(num_workers=num_workers, batch_size=batch_size)
         num_classes, input_dim, train_batches  = 2, 3, None
@@ -71,7 +71,8 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         data_module = ToyTrackDataModule(num_workers=num_workers, batch_size=batch_size)
         num_classes, input_dim,  = 1, 2
     elif data_module == "TML_RAM":
-        data_module = TML_RAM_DataModule(data_path = "/content/TrackML_data/data_list_no_conformal.pt", num_workers=num_workers, batch_size=batch_size)
+        data_module = TML_RAM_DataModule(test_dir ="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_test.pt,
+         train_dir ="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_train.pt", num_workers=num_workers, batch_size=batch_size)
         num_classes, input_dim, train_batches  = 2, 3, None
         
 

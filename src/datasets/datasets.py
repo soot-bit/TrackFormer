@@ -2,7 +2,6 @@ from typing import Optional, Union, List
 from torch.utils.data import TensorDataset, Subset, random_split, DataLoader, Dataset, IterableDataset
 import torch
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
-from rich import print
 import numpy as np
 from tqdm.notebook import tqdm
 from torch.nn.utils.rnn import pad_sequence
@@ -203,12 +202,14 @@ class ToyTrackDataModule(L.LightningDataModule):
 ########################################### TML dataset:
 
 
+#######################
+# Iterable class of 
 
+class TrackMLIterableDataset(IterableDataset):
+    """ Iterable class for TrackML with option to load into ram """
 
-class TrackMLIterableDataset2(IterableDataset):
-    def __init__(self, data_path, tolerance=0.01):
+    def __init__(self, data_path):
         self.data_path = data_path
-        self.tolerance = tolerance
         self.start, self.end = self._event_range()
 
     def _event_range(self):
@@ -219,23 +220,6 @@ class TrackMLIterableDataset2(IterableDataset):
         else:
             raise FileNotFoundError("Uh-oh!, looks like the files are on vacation...")
 
-    def _conformal_mapping(self, x, y, z):
-
-        r = x**2 + y**2
-
-        u = x / r
-        v = y / r
-
-
-        pp, vv = np.polyfit(u, v, 2, cov=True)
-        b = 0.5 / pp[2]
-        a = -pp[1] * b
-        R = np.sqrt(a**2 + b**2)
-
-        magnetic_field = 2.0
-        pT = 0.3 * magnetic_field * R  # in MeV
-
-        return pT / 1_000
 
 
     def __iter__(self):
@@ -256,7 +240,7 @@ class TrackMLIterableDataset2(IterableDataset):
             path = os.path.join(self.data_path, event)
 
             hits, cells, particles, truth = load_event(path)
-            particles = particles[particles['nhits'] >= 6]
+            particles = particles[particles['nhits'] >= 5]
             merged_df = pd.merge(truth, particles, on='particle_id')
             merged_df = pd.merge(merged_df, hits, on='hit_id')
 
@@ -272,13 +256,9 @@ class TrackMLIterableDataset2(IterableDataset):
                 target_tensor = torch.tensor(target, dtype=torch.float32)
 
                 x, y, z = zxy[:, 0], zxy[:, 1], zxy[:, 2]
-                conf_pt = self._conformal_mapping(x, y, z)
 
-
-                error = abs(conf_pt - target_tensor[0].item())
-                if error < self.tolerance:
-                    mask = torch.ones(zxy.shape[0], dtype=torch.bool)
-                    yield (zxy, mask, target_tensor)
+                mask = torch.ones(zxy.shape[0], dtype=torch.bool)
+                yield (zxy, mask, target_tensor)
 
 
 class TrackMLDataModule(L.LightningDataModule):
@@ -307,7 +287,7 @@ class TrackMLDataModule(L.LightningDataModule):
     def _to_ram(self):
         try:
             shutil.copytree(self.data_path, self.ram_path)
-            print("Data copied successfully to RAM...")
+            printr("Data copied successfully to RAM...")
         except Exception as e:
             if "File exists:" in str(e):
                 pass
@@ -317,11 +297,11 @@ class TrackMLDataModule(L.LightningDataModule):
 
 
     def setup(self, stage=None):
-        printr("***Using TrackML Dataset****")
+        printr("***Using TrackML iterable dataset Dataset****")
         data_path = self.ram_path if self.use_ram else self.data_path
-        self.train_dataset = TrackMLIterableDataset2(os.path.join(data_path, "train"))
-        self.val_dataset = TrackMLIterableDataset2(os.path.join(data_path, "val"))
-        self.test_dataset = TrackMLIterableDataset2(os.path.join(data_path, "test"))
+        self.train_dataset = TrackMLIterableDataset(os.path.join(data_path, "train"))
+        self.val_dataset = TrackMLIterableDataset(os.path.join(data_path, "val"))
+        self.test_dataset = TrackMLIterableDataset(os.path.join(data_path, "test"))
 
     def train_dataloader(self):
         return DataLoader(
@@ -363,17 +343,21 @@ class TrackMLDataModule(L.LightningDataModule):
 
 
 
-###################:
-class TrackMLGPU(Dataset):
-    def __init__(self, data_path):
-        super().__init__()
-        self.data = torch.load(data_path)
+################################### 
+class TrackMLRAM(Dataset):
+    _instance = None
+
+    def __new__(cls, data_path):
+        if cls._instance is None:
+            cls._instance = super(TrackMLRAM, cls).__new__(cls)
+            cls._instance.data = torch.load(data_path)
+        return cls._instance
 
     def __len__(self):
-        return len(self.data)
+        return len(self._instance.data)
 
     def __getitem__(self, index):
-        return self.data[index]
+        return self._instance.data[index]
 
 class TML_RAM_DataModule(L.LightningDataModule):
     def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=20, pin_memory=True):
@@ -399,13 +383,13 @@ class TML_RAM_DataModule(L.LightningDataModule):
 
     def setup(self, stage=None):
         print("***Using TrackML shared memory Dataset****")
-        train_data = TrackMLGPU(self.train_dir)
+        train_data = TrackMLRAM(self.train_dir)
         train_size = int(0.8 * len(train_data))
         val_size = len(train_data) - train_size
 
         self.train_dataset, self.val_dataset = random_split(train_data, [train_size, val_size])
 
-        self.test_dataset = TrackMLGPU(self.test_dir)
+        self.test_dataset = TrackMLRAM(self.test_dir)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
@@ -425,10 +409,10 @@ class TML_RAM_DataModule(L.LightningDataModule):
 
 def extract_data(data_path):
     """
-    Extracts features and target and saves the data to Torch files.
+    Extracts features and target and saves the data to Torch tensor.
 
     Args:
-        data_path (str): Path to the dataset.
+       Path to the dataset.
     """
 
     files = os.listdir(data_path)
