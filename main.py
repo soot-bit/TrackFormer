@@ -1,8 +1,7 @@
 import lightning as L
 from src.datasets.datasets import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
-from src.my_model.transformer import RegressionTransformer
+from src.my_model.transformer import TrackFormer
 from src.utils import callbacks_list, read_time, experiment_name
-import argparse
 import click
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -10,13 +9,13 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 
 def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwargs):
-    """Train the transformer model."""
+    """Train the transformer model"""
     
 
-    if train_batches is None:
-        max_iters = epochs * 900
+    if train_batches is None: 
+        max_iters = epochs * 900 #fix this
         test_batches = None
-        val_batches = None
+        val_batches = None 
     else: 
         max_iters = epochs * train_batches
         val_batches = int(0.2 * train_batches)
@@ -25,7 +24,7 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
 
 
 
-    model = RegressionTransformer(max_iters=max_iters, **kwargs)
+    model = TrackFormer(max_iters=max_iters, **kwargs)
 
     # Configure Trainer
     trainer = L.Trainer(
@@ -52,9 +51,10 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
 @click.option('--train_batches', type=int, default=100, help='Limit on the number of training batches per epoch')
 @click.option('--exp_name', type=str, required=True, help='Name the experiment') 
 @click.option('--data_module', type=click.Choice(['ToyTrack', 'TrackML', "TML_RAM"]), help='Choose the dataset..')
+@click.option('--loss_fn', required=True, type=click.Choice(['mse', 'qloss']), help='Choose the loss function..')
 @click.option('--num_workers', type=int, default=15, help='Number of workers for data loading')
 @click.option('--batch_size', type=int, default=20, help='Batch size for training')
-def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, data_module, num_workers, batch_size):
+def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, data_module, num_workers, batch_size, loss_fn):
     """Main function"""
 
     # Name experiment
@@ -89,7 +89,8 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         num_layers=num_layers,
         dropout=dropout,
         lr=lr,
-        warmup=warmup
+        warmup=warmup,
+        loss_type=loss_fn
     )
 
     # Test on best model

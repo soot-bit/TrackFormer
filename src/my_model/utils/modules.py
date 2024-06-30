@@ -3,19 +3,21 @@ import math
 from torch import softmax, nn, optim
 import torch
 import numpy as np
+from torch.nn.functional import mse_loss
 
 
 
-#helper  functions
+
+
+
+
+################################### Helper functions:
+
+
 def expand_mask(mask):
     """
-    Expand the mask tensor to match the dimensions required for masking in MultiheadAttention.
+    Expand the mask tensor to match the dimensions required for masking in MultiheadAttention.   fix  this and test.....
 
-    Args:
-       Mask tensor with shape (batch_size, seq_length) 
-
-    Returns:
-        Expanded mask tensor with shape (batch_size, num_heads, seq_length, seq_length).
     """
 
     assert mask.ndim >= 2, "Mask shape is wrong"
@@ -38,11 +40,10 @@ def scaled_dot_product(q, k, v, mask=None):
     Performs scaled dot-product attention.
     
     Args:
-        q (torch.Tensor): Query tensor  (batch_size, num_heads, seq_len, head_dim).
-        k (torch.Tensor): Key tensor  (batch_size, num_heads, seq_len, head_dim).
-        v (torch.Tensor): Value tensor (batch_size, num_heads, seq_len, head_dim).
-        mask (torch.Tensor, optional): Attention mask of shape (batch_size, 1, 1, seq_len).
-            Defaults to None.
+        q (torch.Tensor): Query tensor  (B, num_heads, seq_len, head_dim).
+        k (torch.Tensor): Key tensor  (B, num_heads, seq_len, head_dim).
+        v (torch.Tensor): Value tensor (B, num_heads, seq_len, head_dim).
+        mask (torch.Tensor, optional): ?
     """
 
     scale_factor = 1 / math.sqrt(q.size(-1)) 
@@ -56,6 +57,30 @@ def scaled_dot_product(q, k, v, mask=None):
     return values, attention
 
 
+
+
+
+class LossFunction:
+    def __init__(self, loss_function: str = "qloss", quantile: float = 0.5):
+        self.quantile = quantile
+        if loss_function == "qloss":
+            self.loss_fn = self.quantile_loss
+        elif loss_function == "mse":
+            self.loss_fn = mse_loss
+        else:
+            raise ValueError("Invalid loss function. Choose either 'quantile' or 'mse'.")
+
+    def __call__(self, preds, targets):
+        return self.loss_fn(preds, targets)
+
+    def quantile_loss(self, preds, targets):
+        errors = targets - preds
+        return torch.mean(torch.max((self.quantile - 1) * errors, self.quantile * errors))
+
+
+
+
+#################################### TrackFormer layers:
 
 class MultiheadAttention(nn.Module):
     
@@ -220,21 +245,6 @@ class PositionalEncoding(nn.Module):
         return x
 
 
-def quantile_loss(outputs, targets, quantile=0.5):
-    """
-    Compute the Quantile Loss for the given outputs and targets.
-    
-    Args:
-        outputs (torch.Tensor): The model's predictions.
-        targets (torch.Tensor): The ground truth targets.
-        quantile (float): The desired quantile to optimize for (between 0 and 1).
-    
-    Returns:
-        torch.Tensor: The Quantile Loss.
-    """
-    errors = targets - outputs
-    loss = torch.max(quantile * errors, (quantile - 1) * errors)
-    return torch.mean(loss)
 
 class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
 
