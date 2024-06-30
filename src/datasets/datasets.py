@@ -345,19 +345,17 @@ class TrackMLDataModule(L.LightningDataModule):
 
 ################################### 
 class TrackMLRAM(Dataset):
-    _instance = None
-
-    def __new__(cls, data_path):
-        if cls._instance is None:
-            cls._instance = super(TrackMLRAM, cls).__new__(cls)
-            cls._instance.data = torch.load(data_path)
-        return cls._instance
+    def __init__(self, data_path):
+        super().__init__()
+        self.data = torch.load(data_path)
 
     def __len__(self):
-        return len(self._instance.data)
+        return len(self.data)
 
     def __getitem__(self, index):
-        return self._instance.data[index]
+        return self.data[index]
+
+
 
 class TML_RAM_DataModule(L.LightningDataModule):
     def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=20, pin_memory=True):
@@ -383,13 +381,14 @@ class TML_RAM_DataModule(L.LightningDataModule):
 
     def setup(self, stage=None):
         print("***Using TrackML shared memory Dataset****")
-        train_data = TrackMLRAM(self.train_dir)
-        train_size = int(0.8 * len(train_data))
-        val_size = len(train_data) - train_size
+        if self.train_dataset is None or self.val_dataset is None or self.test_dataset is None:
 
-        self.train_dataset, self.val_dataset = random_split(train_data, [train_size, val_size])
+            train_data = TrackMLRAM(self.train_dir)
+            train_size = int(0.8 * len(train_data))
+            val_size = len(train_data) - train_size
 
-        self.test_dataset = TrackMLRAM(self.test_dir)
+            self.train_dataset, self.val_dataset = random_split(train_data, [train_size, val_size])
+            self.test_dataset = TrackMLRAM(self.test_dir)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
