@@ -1,30 +1,31 @@
 from typing import Optional, Union, List
-from tqdm import tqdm
 from torch.utils.data import TensorDataset, Subset, random_split, DataLoader, Dataset, IterableDataset
 import torch
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
 from rich import print
 import numpy as np
+from tqdm.notebook import tqdm
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from rainbow_print import printr
 import os
 import shutil
 import math
+import random
 from trackml.dataset import load_dataset, load_event
 import pandas as pd
 
 
 
-
+#############################################################: TOY TRACK
 
             #################################
             #   Track Datasets with padding #
             #################################
 
-class TracksDataset(IterableDataset):
+class ToyTrackDataset(IterableDataset):
     """
-        Generates trackdata on the fly
+        Generates trackdata on the fly using ToyTrack module
     see https://github.com/ryanliu30
     """
     def __init__(
@@ -96,12 +97,13 @@ class _TrackIterable:
 
         return x, mask, torch.tensor([pt], dtype=torch.float), event
 
-class TracksDatasetWrapper(Dataset):
+class ToyTrackWrapper(Dataset):
+    
     """ Generates and stores track data  
         ---------------------------------
     """ 
     def __init__(self, num_events: int = 200):
-        self.tracks_dataset = TracksDataset()
+        self.tracks_dataset = ToyTrackDataset()
         self.num_events = num_events
         self.events = []
 
@@ -127,7 +129,7 @@ class TracksDatasetWrapper(Dataset):
 class ToyTrackDataModule(L.LightningDataModule):
     def __init__(
         self,
-        use_tracks_dataset: bool = True,
+        use_wrapper: bool = False,
         batch_size: int = 20,
         wrapper_size:int = 200,
         num_workers: int = 10,
@@ -139,14 +141,15 @@ class ToyTrackDataModule(L.LightningDataModule):
         self.num_workers = num_workers
         self.persistence = persistence if num_workers == 0 else True
 
-        if use_tracks_dataset:
-            self.dataset = TracksDataset()
+        if use_wrapper:
+            self.dataset = ToyTrackWrapper(wrapper_size)
         else:
-            self.dataset = TracksDatasetWrapper(wrapper_size)
+            self.dataset = ToyTrackDataset()
+            
 
 
     def setup(self, stage=None):
-        if isinstance(self.dataset, TracksDatasetWrapper):
+        if isinstance(self.dataset, ToyTrackWrapper):
             printr(f"**Using TracksDatasetWrapper size:: {len(self.dataset)}**")
             train_len = int(len(self.dataset) * 0.6)
             val_len = int(len(self.dataset) * 0.2)
@@ -154,7 +157,7 @@ class ToyTrackDataModule(L.LightningDataModule):
             self.train_dataset, self.val_dataset, self.test_dataset = random_split(
                 self.dataset, [train_len, val_len, test_len]
             )
-        elif isinstance(self.dataset, TracksDataset):
+        elif isinstance(self.dataset, ToyTrackDataset):
             printr("**Using infinite TracksDataset***")
             self.train_dataset = self.dataset
             self.val_dataset = self.dataset
@@ -186,9 +189,8 @@ class ToyTrackDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             collate_fn=self.collate_fn,
             num_workers=self.num_workers,
-            persistent_workers=self.persistence
+            persistent_workers=self.persistence  
         )
-
     @staticmethod
     def collate_fn(ls):
         """Batch maker"""
@@ -196,6 +198,11 @@ class ToyTrackDataModule(L.LightningDataModule):
         return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze(), list(events)
     
     
+
+
+########################################### TML dataset:
+
+
 
 
 class TrackMLIterableDataset2(IterableDataset):
@@ -369,9 +376,10 @@ class TrackMLGPU(Dataset):
         return self.data[index]
 
 class TML_RAM_DataModule(L.LightningDataModule):
-    def __init__(self, data_path, batch_size=2_000, num_workers=16, pin_memory=False):
+    def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=20, pin_memory=True):
         super().__init__()
-        self.data_path = data_path
+        self.train_dir= train_dir
+        self.test_dir= test_dir
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
@@ -390,13 +398,14 @@ class TML_RAM_DataModule(L.LightningDataModule):
         return inputs, None, targets, None
 
     def setup(self, stage=None):
-        printr("***Using TrackML shared memory Dataset****")
-        dataset = TrackMLGPU(self.data_path)
-        train_size = int(0.7 * len(dataset))
-        val_size = int(0.1 * len(dataset))
-        test_size = len(dataset) - train_size - val_size
+        print("***Using TrackML shared memory Dataset****")
+        train_data = TrackMLGPU(self.train_dir)
+        train_size = int(0.8 * len(train_data))
+        val_size = len(train_data) - train_size
 
-        self.train_dataset, self.val_dataset, self.test_dataset = random_split(dataset, [train_size, val_size, test_size])
+        self.train_dataset, self.val_dataset = random_split(train_data, [train_size, val_size])
+
+        self.test_dataset = TrackMLGPU(self.test_dir)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
@@ -407,5 +416,63 @@ class TML_RAM_DataModule(L.LightningDataModule):
     def test_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
 
+
+
+
+
+
+################################################### Helper function:
+
+def extract_data(data_path):
+    """
+    Extracts features and target and saves the data to Torch files.
+
+    Args:
+        data_path (str): Path to the dataset.
+    """
+
+    files = os.listdir(data_path)
+    files.sort()
+
+    start, end = int(files[0].split('-')[0][5:]), int(files[1_000].split('-')[0][5:]) + 1
+
+    data = []
+
+    total_events = end - start
+
+    for i in tqdm(range(start, end)):
+        event = f'event00000{i:02d}'
+        path = os.path.join(data_path, event)
+
+        hits, cells, particles, truth = load_event(path)
+        particles = particles[particles['nhits'] >= 5]
+        merged_df = pd.merge(truth, particles, on='particle_id')
+        merged_df = pd.merge(merged_df, hits, on='hit_id')
+
+        merged_df['pT'] = np.sqrt(merged_df['px']**2 + merged_df['py']**2)
+
+        grouped = merged_df.groupby('particle_id')
+
+        for particle_id, group in grouped:
+            inputs = group[['tx', 'ty', 'tz']].values
+            target = group[['pT', 'pz']].values[0]
+
+            zxy = torch.tensor(inputs, dtype=torch.float32)
+            target_tensor = torch.tensor(target, dtype=torch.float32)
+
+            data.append((zxy, target_tensor))
+
+    
+   
+
+    #  training and test sets split
+    random.shuffle(data)
+    train_size = int(0.8 * len(data))
+    train_data = data[:train_size]
+    test_data = data[train_size:]
+
+    # Save 
+    torch.save(train_data, "/content/TML_datafiles/tml_hits_preprocessed_train.pt")
+    torch.save(test_data, "/content/TML_datafiles/tml_hits_preprocessed_test.pt")
 
 
