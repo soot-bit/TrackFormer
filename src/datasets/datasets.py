@@ -202,7 +202,7 @@ class ToyTrackDataModule(L.LightningDataModule):
 ########################################### TML dataset:
 
 
-#######################
+#######################data_module
 # Iterable class of 
 
 class TrackMLIterableDataset(IterableDataset):
@@ -344,6 +344,9 @@ class TrackMLDataModule(L.LightningDataModule):
 
 
 ################################### 
+
+global_TrackMLRAM = {}
+
 class TrackMLRAM(Dataset):
     def __init__(self, data_path):
         super().__init__()
@@ -355,17 +358,14 @@ class TrackMLRAM(Dataset):
     def __getitem__(self, index):
         return self.data[index]
 
-
-
 class TML_RAM_DataModule(L.LightningDataModule):
     def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=20, pin_memory=True):
         super().__init__()
-        self.train_dir= train_dir
-        self.test_dir= test_dir
+        self.train_dir = train_dir
+        self.test_dir = test_dir
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
-        self.dataset = None
         self.train_dataset = None
         self.val_dataset = None
         self.test_dataset = None
@@ -373,22 +373,26 @@ class TML_RAM_DataModule(L.LightningDataModule):
     @staticmethod
     def TMLcollate_fn(batch):
         inputs, targets = zip(*batch)
-        
         inputs = pad_sequence(inputs, batch_first=True)
         targets = torch.stack(targets, dim=0)
-
         return inputs, None, targets, None
 
     def setup(self, stage=None):
-        print("***Using TrackML shared memory Dataset****")
         if self.train_dataset is None or self.val_dataset is None or self.test_dataset is None:
+            printr("***Using TrackML shared memory Dataset****")
+            if "train" not in global_TrackMLRAM:
+                global_TrackMLRAM["train"] = TrackMLRAM(self.train_dir)
+                global_TrackMLRAM["test"] = TrackMLRAM(self.test_dir)
 
-            train_data = TrackMLRAM(self.train_dir)
-            train_size = int(0.8 * len(train_data))
-            val_size = len(train_data) - train_size
+            train_data = global_TrackMLRAM["train"]
+            test_data = global_TrackMLRAM["test"]
 
-            self.train_dataset, self.val_dataset = random_split(train_data, [train_size, val_size])
-            self.test_dataset = TrackMLRAM(self.test_dir)
+            self.train_size = int(0.8 * len(train_data))
+            val_size = len(train_data) - self.train_size
+            self.train_dataset, self.val_dataset = random_split(train_data, [self.train_size, val_size])
+            self.test_dataset = test_data
+        else:
+            printr("Datasets already loaded, skipping data loading...")
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
@@ -398,9 +402,6 @@ class TML_RAM_DataModule(L.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
-
-
-
 
 
 

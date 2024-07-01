@@ -10,19 +10,15 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwargs):
     """Train the transformer model"""
-    
 
-    if train_batches is None: 
-        max_iters = epochs * 900 #fix this
+    if train_batches is None:
+        max_iters = epochs * data_module.train_size // data_module.batch_size                                                    
         test_batches = None
-        val_batches = None 
-    else: 
+        val_batches = None
+    else:
         max_iters = epochs * train_batches
         val_batches = int(0.2 * train_batches)
         test_batches = 2 * val_batches
-
-
-
 
     model = TrackFormer(max_iters=max_iters, **kwargs)
 
@@ -49,38 +45,41 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
 @click.option('--warmup', type=int, default=200, help='Number of warmup steps')
 @click.option('--epochs', type=int, default=100, help='Maximum number of epochs to train')
 @click.option('--train_batches', type=int, default=100, help='Limit on the number of training batches per epoch')
-@click.option('--exp_name', type=str, required=True, help='Name the experiment') 
+@click.option('--exp_name', type=str, required=True, help='Name the experiment')
 @click.option('--data_module', type=click.Choice(['ToyTrack', 'TrackML', "TML_RAM"]), help='Choose the dataset..')
 @click.option('--loss_fn', required=True, type=click.Choice(['mse', 'qloss']), help='Choose the loss function..')
 @click.option('--num_workers', type=int, default=15, help='Number of workers for data loading')
-@click.option('--batch_size', type=int, default=20, help='Batch size for training')
+@click.option('--batch_size', type=int, default=200, help='Batch size for training')
 def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, data_module, num_workers, batch_size, loss_fn):
     """Main function"""
 
+
     # Name experiment
     ckp, logger = experiment_name(exp_name)
-    call = callbacks_list  + ckp    
-
-
+    call = callbacks_list + ckp
 
     # DataModules
     if data_module == 'TrackML':
-        data_module = TrackMLDataModule(num_workers=num_workers, batch_size=batch_size)
-        num_classes, input_dim, train_batches  = 2, 3, None
+        data_module_instance = TrackMLDataModule(num_workers=num_workers, batch_size=batch_size)
+        num_classes, input_dim, train_batches = 2, 3, None
     elif data_module == 'ToyTrack':
-        data_module = ToyTrackDataModule(num_workers=num_workers, batch_size=batch_size)
-        num_classes, input_dim,  = 1, 2
+        data_module_instance = ToyTrackDataModule(num_workers=num_workers, batch_size=batch_size)
+        num_classes, input_dim = 1, 2
     elif data_module == "TML_RAM":
-        data_module = TML_RAM_DataModule(test_dir ="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_test.pt",
-         train_dir ="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_train.pt", num_workers=num_workers, batch_size=batch_size)
-        num_classes, input_dim, train_batches  = 2, 3, None
-        
+        data_module_instance = TML_RAM_DataModule(
+            test_dir="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_test.pt",
+            train_dir="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_train.pt",
+            num_workers=num_workers,
+            batch_size=batch_size
+        )
+        data_module_instance.setup()
+        num_classes, input_dim, train_batches = 2, 3, None
 
-    # Train the model
+    # Train 
     trainer, _ = train_transformer(
         call,
         logger,
-        data_module,
+        data_module_instance,
         epochs=epochs,
         train_batches=train_batches,
         input_dim=input_dim,
@@ -94,8 +93,9 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         loss_type=loss_fn
     )
 
+
     # Test on best model
-    test_results = trainer.test(datamodule=data_module, ckpt_path="best", verbose=1)
+    test_results = trainer.test(datamodule=data_module_instance, ckpt_path="best", verbose=1)
     read_time()
 
 if __name__ == '__main__':
