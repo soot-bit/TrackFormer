@@ -8,6 +8,18 @@ import lightning as L
 
 
 class CircleFit:
+    """
+    Least squares Circle fit for ToyTrack.
+
+    use torch Dataloader class to organise the data into batches
+    plot sample of fitted circles against original points, and retrieve
+    the parameters of the fitted circles.
+
+    Attributes:
+        params (list): List of parameters (cx, cy, r) for each fitted circle. None if not fitted yet.
+        data (list): List of xy_batch data points. None if not set yet.
+    """
+    
     def __init__(self):
         self.params = None
         self.data = None
