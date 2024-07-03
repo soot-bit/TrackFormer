@@ -359,7 +359,7 @@ class TrackMLRAM(Dataset):
         return self.data[index]
 
 class TML_RAM_DataModule(L.LightningDataModule):
-    def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=20, pin_memory=True):
+    def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=15, pin_memory=True):
         super().__init__()
         self.train_dir = train_dir
         self.test_dir = test_dir
@@ -458,5 +458,3 @@ def extract_data(data_path):
     # Save 
     torch.save(train_data, "/content/TML_datafiles/tml_hits_preprocessed_train.pt")
     torch.save(test_data, "/content/TML_datafiles/tml_hits_preprocessed_test.pt")
-
-

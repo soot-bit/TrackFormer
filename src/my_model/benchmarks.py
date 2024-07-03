@@ -1,3 +1,11 @@
+import torch
+from scipy.optimize import least_squares
+import numpy as np
+import matplotlib.pyplot as plt
+import torch.nn as nn
+import lightning as L
+ 
+
 
 class CircleFit:
     def __init__(self):
@@ -43,6 +51,12 @@ class CircleFit:
 
 
 
+
+##################################################################:
+
+                            ###################################
+                            #       Neural Networks           #
+                            ###################################
 class DeepNetwork(nn.Module):
     def __init__(self, input_dim, hidden_d, output_dim):
         super().__init__()
@@ -384,7 +398,7 @@ def view_trajectory(inputs, mask=None):
 
     fig.show()
 
-    from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 
