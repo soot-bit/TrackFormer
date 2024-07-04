@@ -4,40 +4,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import lightning as L
+import numba
  
 
+import numpy as np
+import torch
+from scipy.optimize import least_squares
+import numba
 
 class CircleFit:
     """
     Least squares Circle fit for ToyTrack.
 
-    use torch Dataloader class to organise the data into batches
-    plot sample of fitted circles against original points, and retrieve
-    the parameters of the fitted circles.
-
     Attributes:
         params (list): List of parameters (cx, cy, r) for each fitted circle. None if not fitted yet.
-        data (list): List of xy_batch data points. None if not set yet.
+        data (list): List of xy_batch data points from a torch dataloader
     """
     
     def __init__(self):
         self.params = None
         self.data = None
 
-    def _residuals(self, p, xy):
+    @staticmethod
+    @numba.jit(nopython=True)
+    def _residuals(p, xy):
         cx, cy, r = p
-        return torch.sqrt((xy[:, 0] - cx)**2 + (xy[:, 1] - cy)**2) - r
+        return np.sqrt((xy[:, 0] - cx)**2 + (xy[:, 1] - cy)**2) - r
 
     def fit(self, xy_batch):
         self.data = xy_batch
         self.params = []
         for xy in xy_batch:
+            xy = xy.numpy()
             x, y = xy[:, 0], xy[:, 1]
-            init = [x.mean().item(), y.mean().item(), torch.sqrt((x - x.mean())**2 + (y - y.mean())**2).mean().item()]
-            self.params.append(least_squares(self._residuals, init, args=(xy,)).x)
+            init = [x.mean(), y.mean(), np.sqrt((x - x.mean())**2 + (y - y.mean())**2).mean()]
+            self.params.append(least_squares(CircleFit._residuals, init, args=(xy,)).x)
 
-
-        return torch.tensor(self.params)[:,-1]
+        return torch.tensor(self.params)[:, -1]
 
     def plot(self, n=5):
         if self.params is None or self.data is None:
@@ -50,7 +53,7 @@ class CircleFit:
         for idx in picks:
             xy = self.data[idx]
             cx, cy, r = self.params[idx]
-            ax.plot(xy[:, 0].numpy(), xy[:, 1].numpy(), 'o', label=f'Batch {idx + 1}')
+            ax.plot(xy[:, 0], xy[:, 1], 'o', label=f'Batch {idx + 1}')
             ax.add_artist(plt.Circle((cx, cy), r, fill=False, linestyle='--', label=f'Track {idx + 1} (Pt={r:.2f})'))
 
         ax.set_xlabel('X')
@@ -60,7 +63,6 @@ class CircleFit:
         ax.legend()
         ax.grid(True)
         plt.show()
-
 
 
 
