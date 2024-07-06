@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import lightning as L
 import numba
+from torch.nn.functional import mse_loss
+from tqdm.notebook import tqdm
  
 
 import numpy as np
@@ -107,10 +109,10 @@ class ComplexNet(nn.Module):
 
 
 
-class ParticleRegressionModel(L.LightningModule):
-    def __init__(self, NN):
+class MLP(L.LightningModule):
+    def __init__(self):
         super().__init__()
-        self.model = NN()
+        self.model = ComplexNet()
 
 
     def forward(self, x):
@@ -119,9 +121,9 @@ class ParticleRegressionModel(L.LightningModule):
         return x
 
     def _calculate_loss(self, batch, mode: str):
-        inp_data,_,labels,_ = batch
+        inp_data,_, labels,_ = batch
         preds = self(inp_data)
-        loss = F.mse_loss(preds.squeeze(), labels)
+        loss = mse_loss(preds.squeeze(), labels[;,].squeeze())
 
         # Log
         self.log(f"{mode}_loss", loss, on_step=True, prog_bar=True, logger=True, batch_size=labels.numel())
@@ -143,198 +145,85 @@ class ParticleRegressionModel(L.LightningModule):
         return optimizer
 
 
-        def train_nn(network, data_module, epochs=100, train_batches=100, val_batches=100, test_batches=200,  log_steps=40):
-
-    lightning_model = ParticleRegressionModel(network)
-
-    trainer = L.Trainer(
-        logger=logger,
-        limit_train_batches=train_batches,
-        limit_test_batches=test_batches,
-        limit_val_batches=val_batches,
-        log_every_n_steps=log_steps,
-        max_epochs=epochs,
-        callbacks=[timer, checkpoint_callback, param_summary]
-                        )
-
-    trainer.logger._default_hp_metric = None
-
-
-
-    trainer.fit(lightning_model, data_module, ckpt_path="last")
-    trainer.test(datamodule=data_module, ckpt_path="best")
-
-    read_time()
-
-    return trainer
-
-
-import torch
-from scipy.optimize import least_squares
-import numpy as np
-import matplotlib.pyplot as plt
-from numba import jit, njit, vectorize, float64
-from torch.autograd import vmap
-
-class CircleFit:
-    def __init__(self):
-        self.params = None
-        self.data = None
-
-    @staticmethod
-    @jit(nopython=True)
-    def _residuals(p, xy):
-        cx, cy, r = p
-        return np.sqrt((xy[:, 0] - cx)**2 + (xy[:, 1] - cy)**2) - r
-
-    @staticmethod
-    @jit(nopython=True)
-    def _fit_single(xy):
-        x, y = xy[:, 0], xy[:, 1]
-        init = [x.mean(), y.mean(), np.sqrt((x - x.mean())**2 + (y - y.mean())**2).mean()]
-        return least_squares(CircleFit._residuals, init, args=(xy,)).x
-
-    def fit(self, xy_batch):
-        self.data = xy_batch
-        self.params = np.zeros((len(xy_batch), 3))
-        for i in range(len(xy_batch)):
-            self.params[i] = self._fit_single(xy_batch[i])
-        return self.params[:, -1]
-
-    @staticmethod
-    @njit(parallel=True)
-    def circle_points(radius, center, num_points):
-        """
-        Generates points on a circle.
-        """
-        angles = np.linspace(0, 2 * np.pi, num_points)
-        x = center[0] + radius * np.cos(angles)
-        y = center[1] + radius * np.sin(angles)
-        xy = np.stack((x, y), axis=1)
-        return xy
-
-    def plot(self, n=5):
-        if self.params is None or self.data is None:
-            raise ValueError("Ohh my ..!")
-
-        n_plots = min(n, len(self.data))
-        picks = np.random.choice(range(len(self.data)), n_plots, replace=False)
-        fig, ax = plt.subplots(figsize=(8, 8))
-
-        for idx in picks:
-            xy = self.data[idx]
-            cx, cy, r = self.params[idx]
-            ax.plot(xy[:, 0], xy[:, 1], 'o', label=f'Batch {idx + 1}')
-            ax.add_artist(plt.Circle((cx, cy), r, fill=False, linestyle='--', label=f'Track {idx + 1} (Pt={r:.2f})'))
-
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_title(f'Circle Fitting for {n_plots} Batches')
-        ax.set_aspect('equal', 'box')
-        ax.legend()
-        ax.grid(True)
-        plt.show()
-
-
-        import torch.nn.functional as F
-from sklearn.utils import resample
-from scipy.stats import bootstrap
-
-
-def TMLcollate_fn(batch):
-    inputs, targets = zip(*batch)
-
-    inputs = pad_sequence(inputs, batch_first=True)
-    targets = torch.stack(targets, dim=0)
-
-    return inputs, None, targets, None
-
-loader  = DataLoader(data, batch_size=5000, shuffle=True, num_workers=10, collate_fn=TMLcollate_fn)
-
-# models
-dir_mse_TML = "/content/aims_proj/saved_models/full_TMLdataset_ram_unfiltered_last_dim/model-epoch=45-val_loss=0.226.ckpt"
-
-
-
-# Load models
-transf_mse_model = TrackingTransformer.load_from_checkpoint(dir_mse_TML)
-transf_mse_model.eval().to("cpu")
-
-
-
-
-
-# Initialize lists to store the MAE values
-m_transf_mae_pt= []
-m_transf_mae_pz = []
-
-pt_conf_mae_list = []
-batch_limit = 10
-epochs = 1
-for epoch in tqdm(range(epochs)):
-    with torch.no_grad():
-        for i, (input, _, target, _) in enumerate(loader):
-            if i >= batch_limit:
-                break
-            # Transformer MSE
-            pred1 = transf_mse_model(input)
-            pt_mae1 = F.l1_loss(pred1[:,0], target[:,0])
-            pz_mae1 = F.l1_loss(pred1[:,1], target[:,1])
-
-            m_transf_mae_pt.append(pt_mae1.item())
-            m_transf_mae_pz.append(pz_mae1.item())
-
-
-            # Transformer Qloss
-            pred2 = qloss_transf_tt_model(input)
-            pt_mae2 = F.l1_loss(pred2[:,0], target[:,0])
-            pz_mae2 = F.l1_loss(pred2[:,1], target[:,1])
-
-            q_transf_mae_pt.append(pt_mae2.item())
-            q_transf_mae_pz.append(pz_mae2.item())
-
-            # conformal fitt squares
-            pt_conf_mae = conformal_mae(input, target)
-            pt_conf_mae_list.append(pt_conf_mae.item())
 
 
 
 
 
 
-# Convert lists to numpy arrays
-m_transf_mae_pt = np.array(m_transf_mae_pt)
-# q_transf_mae_pt = np.array(q_transf_mae_pt)
-m_transf_mae_pz = np.array(m_transf_mae_pz)
-# q_transf_mae_pz = np.array(q_transf_mae_pz)
-pt_conf_mae_list = np.array(pt_conf_mae_list)
 
-def calculate_ci(data, confidence=0.95, n_resamples=1000):
-    res = bootstrap((data,), np.mean, confidence_level=confidence, n_resamples=n_resamples, method='percentile')
-    mean = np.mean(data)
-    ci_lower = res.confidence_interval.low
-    ci_upper = res.confidence_interval.high
-    delta = (ci_upper - mean) / 2
-    return mean, delta
+# # Initialize lists to store the MAE values
+# m_transf_mae_pt= []
+# m_transf_mae_pz = []
 
-#confidence intervals
-transf_mse_pt_mean, transf_mse_pt_delta = calculate_ci(m_transf_mae_pt)
-# transf_q_pt_mean, transf_q_pt_delta = calculate_ci(q_transf_mae_pt)
-transf_mse_pz_mean, transf_mse_pz_delta = calculate_ci(m_transf_mae_pz)
-# transf_q_pz_mean, transf_q_pz_delta = calculate_ci(q_transf_mae_pz)
-pt_conf_mean, pt_conf_delta = calculate_ci(pt_conf_mae_list)
+# pt_conf_mae_list = []
+# batch_limit = 10
+# epochs = 1
+# for epoch in tqdm(range(epochs)):
+#     with torch.no_grad():
+#         for i, (input, _, target, _) in enumerate(loader):
+#             if i >= batch_limit:
+#                 break
+#             # Transformer MSE
+#             pred1 = transf_mse_model(input)
+#             pt_mae1 = F.l1_loss(pred1[:,0], target[:,0])
+#             pz_mae1 = F.l1_loss(pred1[:,1], target[:,1])
+
+#             m_transf_mae_pt.append(pt_mae1.item())
+#             m_transf_mae_pz.append(pz_mae1.item())
 
 
-print(f"Transformer MSE PT MAE: {transf_mse_pt_mean:.4f} ± {transf_mse_pt_delta:.4f}")
-# print(f"Transformer Qloss PT MAE: {transf_q_pt_mean:.4f} ± {transf_q_pt_delta:.4f}")
-print(f"Transformer MSE PZ MAE: {transf_mse_pz_mean:.4f} ± {transf_mse_pz_delta:.4f}")
-# print(f"Transformer Qloss PZ MAE: {transf_q_pz_mean:.4f} ± {transf_q_pz_delta:.4f}")
-print(f"Conformal MAE: {pt_conf_mean:.4f} ± {pt_conf_delta:.4f}")
+#             # Transformer Qloss
+#             pred2 = qloss_transf_tt_model(input)
+#             pt_mae2 = F.l1_loss(pred2[:,0], target[:,0])
+#             pz_mae2 = F.l1_loss(pred2[:,1], target[:,1])
+
+#             q_transf_mae_pt.append(pt_mae2.item())
+#             q_transf_mae_pz.append(pz_mae2.item())
+
+#             # conformal fitt squares
+#             pt_conf_mae = conformal_mae(input, target)
+#             pt_conf_mae_list.append(pt_conf_mae.item())
+
+
+
+
+
+
+# # Convert lists to numpy arrays
+# m_transf_mae_pt = np.array(m_transf_mae_pt)
+# # q_transf_mae_pt = np.array(q_transf_mae_pt)
+# m_transf_mae_pz = np.array(m_transf_mae_pz)
+# # q_transf_mae_pz = np.array(q_transf_mae_pz)
+# pt_conf_mae_list = np.array(pt_conf_mae_list)
+
+# def calculate_ci(data, confidence=0.95, n_resamples=1000):
+#     res = bootstrap((data,), np.mean, confidence_level=confidence, n_resamples=n_resamples, method='percentile')
+#     mean = np.mean(data)
+#     ci_lower = res.confidence_interval.low
+#     ci_upper = res.confidence_interval.high
+#     delta = (ci_upper - mean) / 2
+#     return mean, delta
+
+# #confidence intervals
+# transf_mse_pt_mean, transf_mse_pt_delta = calculate_ci(m_transf_mae_pt)
+# # transf_q_pt_mean, transf_q_pt_delta = calculate_ci(q_transf_mae_pt)
+# transf_mse_pz_mean, transf_mse_pz_delta = calculate_ci(m_transf_mae_pz)
+# # transf_q_pz_mean, transf_q_pz_delta = calculate_ci(q_transf_mae_pz)
+# pt_conf_mean, pt_conf_delta = calculate_ci(pt_conf_mae_list)
+
+
+# print(f"Transformer MSE PT MAE: {transf_mse_pt_mean:.4f} ± {transf_mse_pt_delta:.4f}")
+# # print(f"Transformer Qloss PT MAE: {transf_q_pt_mean:.4f} ± {transf_q_pt_delta:.4f}")
+# print(f"Transformer MSE PZ MAE: {transf_mse_pz_mean:.4f} ± {transf_mse_pz_delta:.4f}")
+# # print(f"Transformer Qloss PZ MAE: {transf_q_pz_mean:.4f} ± {transf_q_pz_delta:.4f}")
+# print(f"Conformal MAE: {pt_conf_mean:.4f} ± {pt_conf_delta:.4f}")
 
 
 
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 def plot_aggregated_attention_maps(input_data, attn_maps, idx=0, display_labels=False, concat_heads=False):
     """
@@ -411,49 +300,3 @@ def view_trajectory(inputs, mask=None):
     )
 
     fig.show()
-
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-
-def sk_regression(train_loader, test_loader):
-    # Train
-    X_train, _, y_train, _ = next(iter(train_loader))
-    X_train = X_train.view(X_train.shape[0], -1)
-
-    # Test
-    X_test, _, y_test, _ = next(iter(test_loader))
-    X_test = X_test.view(X_test.shape[0], -1)
-
-    # Model
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-    y_train_pred = model.predict(X_train)
-    y_test_pred = model.predict(X_test)
-
-    # Metrics
-    train_mse = mean_squared_error(y_train, y_train_pred)
-    train_r2 = r2_score(y_train, y_train_pred)
-    test_mse = mean_squared_error(y_test, y_test_pred)
-    test_r2 = r2_score(y_test, y_test_pred)
-
-    console = Console()
-    table = Table(title="Linear Regression Metrics")
-    table.add_column("Metric", style="cyan", no_wrap=True)
-    table.add_column("Train", style="green", no_wrap=True)
-    table.add_column("Test", style="red", no_wrap=True)
-    table.add_row("MSE", f"{train_mse:.5f}", f"{test_mse:.5f}")
-    table.add_row("R-squared", f"{train_r2:.5f}", f"{test_r2:.5f}")
-    console.print(table)
-
-    plt.hist(y_train)
-
-
-    #finite data with a
-data_module_wrapper = TracksDataModule(False, batch_size=1000)
-data_module_wrapper.setup()
-
-train_loader = data_module_wrapper.train_dataloader()
-test_loader = data_module_wrapper.test_dataloader()
-
-sk_regression(train_loader, test_loader)

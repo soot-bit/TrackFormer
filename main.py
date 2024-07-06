@@ -1,6 +1,7 @@
 import lightning as L
 from src.datasets.datasets import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
 from src.my_model.transformer import TrackFormer
+from src.my_model.benchmarks import MLP
 from src.utils import callbacks_list, read_time, experiment_name
 import click
 from lightning.pytorch.callbacks import ModelCheckpoint
@@ -8,8 +9,8 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 
 
-def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwargs):
-    """Train the transformer model"""
+def stage_trainer(model, ckpts, logger, data_module, epochs, train_batches, **kwargs):
+    """Train the models"""
 
     if train_batches is None:
         max_iters = epochs * data_module.train_size // data_module.batch_size                                                    
@@ -19,8 +20,12 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
         max_iters = epochs * train_batches
         val_batches = int(0.2 * train_batches)
         test_batches = 2 * val_batches
+    
+    if model == 'TrackFormer':
+        lighting_model = TrackFormer(max_iters=max_iters, **kwargs)
+    else:
+        lighting_model = MLP()
 
-    model = TrackFormer(max_iters=max_iters, **kwargs)
 
     # Configure Trainer
     trainer = L.Trainer(
@@ -32,8 +37,10 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
         logger=logger,
         callbacks=ckpts,
     )
-    trainer.fit(model, data_module, ckpt_path="last")
-    return trainer, model
+
+    trainer.logger._default_hp_metric = None
+    trainer.fit(lighting_model, data_module, ckpt_path="last")
+    return trainer, lighting_model
 
 
 @click.command()
@@ -50,7 +57,8 @@ def train_transformer(ckpts, logger, data_module, epochs, train_batches, **kwarg
 @click.option('--loss_fn', required=True, type=click.Choice(['mse', 'qloss']), help='Choose the loss function..')
 @click.option('--num_workers', type=int, default=15, help='Number of workers for data loading')
 @click.option('--batch_size', type=int, default=200, help='Batch size for training')
-def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, data_module, num_workers, batch_size, loss_fn):
+@click.option('--model', type=click.Choice(['NN', 'TrackFormer']), help='MLP or tansformer')
+def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, data_module, num_workers, batch_size, loss_fn, model):
     """Main function"""
 
 
@@ -76,7 +84,8 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         num_classes, input_dim, train_batches = 2, 3, None
 
     # Train 
-    trainer, _ = train_transformer(
+    trainer, _ = stage_trainer(
+        model,
         call,
         logger,
         data_module_instance,
