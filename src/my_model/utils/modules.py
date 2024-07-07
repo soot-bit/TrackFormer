@@ -14,26 +14,6 @@ from torch.nn.functional import mse_loss
 ################################### Helper functions:
 
 
-def expand_mask(mask):
-    """
-    Expand the mask tensor to match the dimensions required for masking in MultiheadAttention.   fix  this and test.....
-
-    """
-
-    assert mask.ndim >= 2, "Mask shape is wrong"
-    
-    if mask.ndim == 2:
-        # If mask is 2D, broadcast it over batch size and number of heads
-        mask = mask.unsqueeze(1) 
-        mask = mask.unsqueeze(1) 
-    
-    elif mask.ndim == 3:
-        # If mask is 3D, broadcast it over number of heads
-        mask = mask.unsqueeze(1)  # Add seq_length dimension
-    
-    return mask.expand(-1, -1, mask.size(-1), mask.size(-1))
-
-
 
 def scaled_dot_product(q, k, v, mask=None):
     """
@@ -50,6 +30,7 @@ def scaled_dot_product(q, k, v, mask=None):
     attn_weight = q @ k.transpose(-2, -1) * scale_factor
 
     if mask is not None:
+        mask = mask.unsqueeze(1).unsqueeze(2)  # [Batch, 1, 1, SeqLen]
         attn_weight = attn_weight.masked_fill(mask == 0, float("-inf"))
 
     attention = softmax(attn_weight, dim=-1)
@@ -116,7 +97,6 @@ class MultiheadAttention(nn.Module):
         self._reset_parameters()
 
     def _reset_parameters(self):
-        #  initialization
         nn.init.xavier_uniform_(self.qkv_proj.weight)
         self.qkv_proj.bias.data.fill_(0)
         nn.init.xavier_uniform_(self.o_proj.weight)
@@ -124,8 +104,6 @@ class MultiheadAttention(nn.Module):
 
     def forward(self, x, mask=None, return_attention=False):
         batch_size, seq_length, _ = x.size()
-        if mask is not None:
-            mask = expand_mask(mask)
         qkv = self.qkv_proj(x)
 
         # Separate Q, K, V from linear output

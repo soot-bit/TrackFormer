@@ -51,7 +51,7 @@ class TrackFormer(L.LightningModule):
         )
 
 
-    def forward(self, x, mask=None, add_positional_encoding=True):
+    def forward(self, x, mask=None, add_positional_encoding=False):
         """
         Inputs:
             x - Input features [Batch, SeqLen, input_dim]
@@ -67,7 +67,7 @@ class TrackFormer(L.LightningModule):
         return x
 
     @torch.no_grad()
-    def get_attention_maps(self, x, mask=None, add_positional_encoding=True):
+    def get_attention_maps(self, x, mask=None, add_positional_encoding=False):
         """
         Function for extracting the attention matrices
         """
@@ -91,7 +91,7 @@ class TrackFormer(L.LightningModule):
 
         inputs, mask, label, _ = batch
 
-        preds = self(inputs, add_positional_encoding=False)
+        preds = self(inputs, mask, add_positional_encoding=False)
         loss = self.loss_crit(preds.squeeze(), label.squeeze())
 
         self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )

@@ -370,39 +370,34 @@ class TML_RAM_DataModule(L.LightningDataModule):
         self.val_dataset = None
         self.test_dataset = None
 
-    @staticmethod
-    def TMLcollate_fn(batch):
-        inputs, targets = zip(*batch)
-        inputs = pad_sequence(inputs, batch_first=True)
-        targets = torch.stack(targets, dim=0)
-        return inputs, None, targets, None
 
-    def setup(self, stage=None):
-        if self.train_dataset is None or self.val_dataset is None or self.test_dataset is None:
-            printr("***Using TrackML shared memory Dataset****")
-            if "train" not in global_TrackMLRAM:
-                global_TrackMLRAM["train"] = TrackMLRAM(self.train_dir)
-                global_TrackMLRAM["test"] = TrackMLRAM(self.test_dir)
+        if "train" not in global_TrackMLRAM:
+            global_TrackMLRAM["train"] = TrackMLRAM(self.train_dir)
+            global_TrackMLRAM["test"] = TrackMLRAM(self.test_dir)
 
-            train_data = global_TrackMLRAM["train"]
-            test_data = global_TrackMLRAM["test"]
-
-            self.train_size = int(0.8 * len(train_data))
-            val_size = len(train_data) - self.train_size
-            self.train_dataset, self.val_dataset = random_split(train_data, [self.train_size, val_size])
-            self.test_dataset = test_data
-        else:
-            printr("Datasets already loaded, skipping data loading...")
+        train_data = global_TrackMLRAM["train"]
+        self.train_size = int(0.8 * len(train_data))
+        val_size = len(train_data) - self.train_size
+        self.train_dataset, self.val_dataset = random_split(train_data, [self.train_size, val_size])
+        self.test_dataset = global_TrackMLRAM["test"]
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
 
+    @staticmethod
+    def TMLcollate_fn(batch):
+            inputs, targets = zip(*batch)
+            masks = [torch.ones(len(input), dtype=torch.bool) for input in inputs]
+            inputs = pad_sequence(inputs, batch_first=True, padding_value=0)
+            mask = pad_sequence(masks, batch_first=True, padding_value=False)
+            targets = torch.stack(targets, dim=0)
+            return inputs, mask, targets, None
 
 
 ################################################### Helper function:

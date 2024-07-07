@@ -123,7 +123,7 @@ class MLP(L.LightningModule):
     def _calculate_loss(self, batch, mode: str):
         inp_data,_, labels,_ = batch
         preds = self(inp_data)
-        loss = mse_loss(preds.squeeze(), labels[;,].squeeze())
+        loss = mse_loss(preds.squeeze(), labels[:,].squeeze())
 
         # Log
         self.log(f"{mode}_loss", loss, on_step=True, prog_bar=True, logger=True, batch_size=labels.numel())

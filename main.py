@@ -62,11 +62,11 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
     """Main function"""
 
 
-    # Name experiment
+    # experiment
     ckp, logger = experiment_name(exp_name)
     call = callbacks_list + ckp
 
-    # DataModules
+    # DataModule
     if data_module == 'TrackML':
         data_module_instance = TrackMLDataModule(num_workers=num_workers, batch_size=batch_size)
         num_classes, input_dim, train_batches = 2, 3, None
@@ -80,7 +80,6 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
             num_workers=num_workers,
             batch_size=batch_size
         )
-        data_module_instance.setup()
         num_classes, input_dim, train_batches = 2, 3, None
 
     # Train 
