@@ -132,29 +132,39 @@ class ToyTrackDataModule(L.LightningDataModule):
         batch_size: int = 20,
         wrapper_size:int = 200,
         num_workers: int = 10,
-        persistence: bool = False
-
+        persistence: bool = False,
+    
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.persistence = persistence if num_workers == 0 else True
+        
 
         if use_wrapper:
             self.dataset = ToyTrackWrapper(wrapper_size)
-        else:
-            self.dataset = ToyTrackDataset()
-            
-
-
-    def setup(self, stage=None):
-        if isinstance(self.dataset, ToyTrackWrapper):
             printr(f"**Using TracksDatasetWrapper size:: {len(self.dataset)}**")
             train_len = int(len(self.dataset) * 0.6)
             val_len = int(len(self.dataset) * 0.2)
-            test_len = len(self.dataset) - train_len - val_len
+            test_len = len(self.dataset) - self.train_len - val_len
             self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-                self.dataset, [train_len, val_len, test_len]
+                self.dataset, [self.train_len, val_len, test_len]
+            )
+            self.train_batches = train_len//self.batch_size
+
+        else:
+            self.dataset = ToyTrackDataset()
+            self.train_batches = None
+            
+
+
+        if isinstance(self.dataset, ToyTrackWrapper):
+            printr(f"**Using TracksDatasetWrapper size:: {len(self.dataset)}**")
+            self.train_len = int(len(self.dataset) * 0.6)
+            val_len = int(len(self.dataset) * 0.2)
+            test_len = len(self.dataset) - self.train_len - val_len
+            self.train_dataset, self.val_dataset, self.test_dataset = random_split(
+                self.dataset, [self.train_len, val_len, test_len]
             )
         elif isinstance(self.dataset, ToyTrackDataset):
             printr("**Using infinite TracksDataset***")
@@ -366,13 +376,12 @@ class TML_RAM_DataModule(L.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_dataset = None
+
 
 
         if "train" not in global_TrackMLRAM:
             global_TrackMLRAM["train"] = TrackMLRAM(self.train_dir)
+        if "test" not in global_TrackMLRAM:
             global_TrackMLRAM["test"] = TrackMLRAM(self.test_dir)
 
         train_data = global_TrackMLRAM["train"]
@@ -380,6 +389,7 @@ class TML_RAM_DataModule(L.LightningDataModule):
         val_size = len(train_data) - self.train_size
         self.train_dataset, self.val_dataset = random_split(train_data, [self.train_size, val_size])
         self.test_dataset = global_TrackMLRAM["test"]
+        self.train_batches = self.train_size // self.batch_size
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
