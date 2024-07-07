@@ -20,20 +20,27 @@ def scaled_dot_product(q, k, v, mask=None):
     Performs scaled dot-product attention.
     
     Args:
-        q (torch.Tensor): Query tensor  (B, num_heads, seq_len, head_dim).
-        k (torch.Tensor): Key tensor  (B, num_heads, seq_len, head_dim).
-        v (torch.Tensor): Value tensor (B, num_heads, seq_len, head_dim).
-        mask (torch.Tensor, optional): ?
+        q, k, v (torch.Tensor)  : Query , Key , value  tensors  (B, num_heads, seq_len, head_dim).
+        mask : batch firts mask
     """
 
-    scale_factor = 1 / math.sqrt(q.size(-1)) 
+    scale_factor = 1 / math.sqrt(q.size(-1))
     attn_weight = q @ k.transpose(-2, -1) * scale_factor
+
+
 
     if mask is not None:
         mask = mask.unsqueeze(1).unsqueeze(2)  # [Batch, 1, 1, SeqLen]
-        attn_weight = attn_weight.masked_fill(mask == 0, float("-inf"))
+        attn_weight = attn_weight.masked_fill(mask == 0, float("-inf"))   # this works well
 
-    attention = softmax(attn_weight, dim=-1)
+
+
+
+    attention = torch.softmax(attn_weight, dim=-1)
+    if mask is not None:
+        attention = attention.permute(0,1,3,2).masked_fill(mask == 0,  0)
+        attention = attention.permute(0,1,3,2)
+    
     values = attention @ v
     return values, attention
 

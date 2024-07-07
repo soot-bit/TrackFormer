@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import  Callback
 
 class TrackFormer(L.LightningModule):
 
-    def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, lr, warmup, max_iters, loss_type, dropout=0.0, input_dropout=0.0):
+    def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, lr, warmup, max_iters, loss_type, quantile = 0.5, dropout=0.0, input_dropout=0.0):
         """
         Inputs:
             input_dim - Hidden dimensionality of the input
@@ -24,7 +24,7 @@ class TrackFormer(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self._create_model()
-        self.loss_crit =  LossFunction(loss_type)
+        self.loss_crit =  LossFunction(loss_type, quantile)
 
     def _create_model(self):
         # Input dim -> Model dim
@@ -92,8 +92,8 @@ class TrackFormer(L.LightningModule):
         inputs, mask, label, _ = batch
 
         preds = self(inputs, mask, add_positional_encoding=False)
-        loss = self.loss_crit(preds.squeeze(), label.squeeze())
-
+        # loss = self.loss_crit(preds.squeeze(), label.squeeze())
+        loss = torch.nn.L1Loss()(preds.squeeze(), label.squeeze())
         self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
         return loss
 

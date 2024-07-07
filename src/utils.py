@@ -58,7 +58,7 @@ class OverfittingEarlyStopping(EarlyStopping):
 def experiment_name(exp):
     ckp = ModelCheckpoint(
                 dirpath=f"/content/aims_proj/saved_models/{exp}",
-                filename="best_model",
+                filename="best_model{epoch:02d}-{val_loss:.2f}",
                 save_top_k=1,
                 verbose=True,
                 monitor="val_loss",
@@ -84,10 +84,10 @@ def read_time():
 def stage_data(dm, num_workers, batch_size):
     if dm == 'TrackML':
         data_module_instance = TrackMLDataModule(num_workers=num_workers, batch_size=batch_size)
-        num_classes, input_dim, train_batches = 2, 3, data_module_instance.train_batches
+        num_classes, input_dim, train_batches, val_batch, test_batch = 2, 3, data_module_instance.train_batches, None, None
     elif dm == 'ToyTrack':
         data_module_instance = ToyTrackDataModule(num_workers=num_workers, batch_size=batch_size)
-        num_classes, input_dim, val_batch, test_batch = 1, 2
+        num_classes, input_dim, train_batches, val_batch, test_batch = 1, 2
     elif dm == "TML_RAM":
         data_module_instance = TML_RAM_DataModule(
             test_dir="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_test.pt",
@@ -96,7 +96,7 @@ def stage_data(dm, num_workers, batch_size):
             batch_size=batch_size
         )
         num_classes, input_dim, train_batches, val_batch, test_batch = 2, 3, data_module_instance.train_batches, None, None
-    return  data_module_instance, num_classes, input_dim, train_batches, test_batch
+    return  data_module_instance, num_classes, input_dim, train_batches, val_batch, test_batch
 
     
 summary = RichModelSummary()

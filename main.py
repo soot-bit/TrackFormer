@@ -11,14 +11,6 @@ from lightning.pytorch.loggers import TensorBoardLogger
 def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, epochs, train_batches, **kwargs):
     """Train the models"""
 
-    # if train_batches is None:
-    #     max_iters = epochs * data_module.train_size // data_module.batch_size                                                    
-    #     test_batches = None
-    #     val_batches = None
-    # else:
-    #     max_iters = epochs * train_batches
-    #     val_batches = int(0.2 * train_batches)
-    #     test_batches = 2 * val_batches
     
     if model == 'TrackFormer':
         lighting_model = TrackFormer(max_iters=epochs * train_batches, **kwargs)
@@ -48,16 +40,17 @@ def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, 
 @click.option('--num_layers', type=int, default=6, help='Number of transformer layers')
 @click.option('--dropout', type=float, default=0.1, help='Dropout rate')
 @click.option('--lr', type=float, default=5e-4, help='Learning rate')
-@click.option('--warmup', type=int, default=200, help='Number of warmup steps')
+@click.option('--warmup', type=int, default=100, help='Number of warmup steps')
 @click.option('--epochs', type=int, default=100, help='Maximum number of epochs to train')
 @click.option('--train_batches', type=int, default=100, help='Limit on the number of training batches per epoch')
 @click.option('--exp_name', type=str, required=True, help='Name the experiment')
 @click.option('--dataset', type=click.Choice(['ToyTrack', 'TrackML', "TML_RAM"]), help='Choose the dataset..')
 @click.option('--loss_fn', required=True, type=click.Choice(['mse', 'qloss']), help='Choose the loss function..')
+@click.option('--q', type=float, default=0.1, help='Choose the quantile function..')
 @click.option('--num_workers', type=int, default=15, help='Number of workers for data loading')
 @click.option('--batch_size', type=int, default=200, help='Batch size for training')
 @click.option('--model', type=click.Choice(['NN', 'TrackFormer']), help='MLP or tansformer')
-def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, dataset, num_workers, batch_size, loss_fn, model):
+def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, dataset, num_workers, batch_size, loss_fn, model, q):
     """Main function"""
 
 
@@ -85,6 +78,7 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         num_layers=num_layers,
         dropout=dropout,
         lr=lr,
+        quantile= q,
         warmup=warmup,
         loss_type=loss_fn
     )
