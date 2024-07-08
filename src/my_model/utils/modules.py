@@ -3,7 +3,7 @@ import math
 from torch import softmax, nn, optim
 import torch
 import numpy as np
-from torch.nn.functional import mse_loss
+from torch.nn.functional import mse_loss, l1_loss
 
 
 
@@ -51,12 +51,16 @@ def scaled_dot_product(q, k, v, mask=None):
 class LossFunction:
     def __init__(self, loss_function: str = "qloss", quantile: float = 0.5):
         self.quantile = quantile
-        if loss_function == "qloss":
-            self.loss_fn = self.quantile_loss
-        elif loss_function == "mse":
-            self.loss_fn = mse_loss
-        else:
-            raise ValueError("Invalid loss function. Choose either 'quantile' or 'mse'.")
+        self.loss_functions = {
+            "qloss": self.quantile_loss,
+            "mse": mse_loss,
+            "mae": l1_loss
+        }
+
+        if loss_function not in self.loss_functions:
+            raise ValueError("Invalid loss function. Choose either 'qloss', 'mse', or 'mae'.")
+        
+        self.loss_fn = self.loss_functions[loss_function]
 
     def __call__(self, preds, targets):
         return self.loss_fn(preds, targets)
@@ -80,13 +84,6 @@ class MultiheadAttention(nn.Module):
         input_dim (int): Input dimension.
         embed_dim (int): Embedding dimension.
         num_heads (int): Number of attention heads.
-
-    Attributes:
-        embed_dim (int): Embedding dimension.
-        num_heads (int): Number of attention heads.
-        head_dim (int): Dimension of each attention head.
-        qkv_proj (nn.Linear): Linear layer to project the input into query, key, and value tensors.
-        o_proj (nn.Linear): Linear layer to project the output of the attention mechanism.
     """
 
     def __init__(self, input_dim, embed_dim, num_heads):
@@ -97,8 +94,7 @@ class MultiheadAttention(nn.Module):
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads # d_k
 
-        # Stacked weight matrices 1...h together for efficiency
-        self.qkv_proj = nn.Linear(input_dim, 3*embed_dim)
+        self.qkv_proj = nn.Linear(input_dim, 3*embed_dim) #stacked matrices
         self.o_proj = nn.Linear(embed_dim, embed_dim)
 
         self._reset_parameters()
@@ -113,14 +109,14 @@ class MultiheadAttention(nn.Module):
         batch_size, seq_length, _ = x.size()
         qkv = self.qkv_proj(x)
 
-        # Separate Q, K, V from linear output
+        # Separate Q, K, V 
         qkv = qkv.reshape(batch_size, seq_length, self.num_heads, 3*self.head_dim)
-        qkv = qkv.permute(0, 2, 1, 3) # [Batch, Head, SeqLen, Dims]
+        qkv = qkv.permute(0, 2, 1, 3) # [B, Head, SeqLen, Dims]
         q, k, v = qkv.chunk(3, dim=-1)
 
         
         values, attention = scaled_dot_product(q, k, v, mask=mask)
-        values = values.permute(0, 2, 1, 3) # [Batch, SeqLen, Head, Dims]
+        values = values.permute(0, 2, 1, 3) # [B, SeqLen, Head, Dims]
         values = values.reshape(batch_size, seq_length, self.embed_dim)
         o = self.o_proj(values)
 
@@ -140,19 +136,12 @@ class EncoderBlock(nn.Module):
         num_heads (int): Number of attention heads.
         dim_feedforward (int): Dimension of the feedforward network.
         dropout (float, optional): Dropout rate. Defaults to 0.0.
-
-    Attributes:
-        self_attn (MultiheadAttention): Multihead attention layer.
-        linear_net (nn.Sequential): Feedforward network.
-        norm1 (nn.LayerNorm): Layer normalization after the attention layer.
-        norm2 (nn.LayerNorm): Layer normalization after the feedforward network.
-        dropout (nn.Dropout): Dropout layer.
     """
     def __init__(self, input_dim, num_heads, dim_feedforward, dropout=0.0):
 
         super().__init__()
 
-        # Attention layer
+        # Attention 
         self.self_attn = MultiheadAttention(input_dim, input_dim, num_heads)
 
         # ff
@@ -163,7 +152,7 @@ class EncoderBlock(nn.Module):
             nn.Linear(dim_feedforward, input_dim)
         )
 
-        # Layers to apply in between the main layers
+        # Layers Norms
         self.norm1 = nn.LayerNorm(input_dim)
         self.norm2 = nn.LayerNorm(input_dim)
         self.dropout = nn.Dropout(dropout)

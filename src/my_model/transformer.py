@@ -6,33 +6,40 @@ from lightning.pytorch.callbacks import  Callback
 
 
 class TrackFormer(L.LightningModule):
+    """
+        A Transformer-based model for track fitting.
+
+        The TrackFormer is designed to fit tracks from a set of hits as input features. It takes in a sequence of track-related
+        hits (B, seqL, 3/2) and outputs a sequence of track parameter predictions, such as the track position, momentum, and other
+        relevant quantities.
+
+        Args:
+            input_dim (int): Dimensionality of hits .
+            model_dim (int): Hidden dimensionality to use inside the Transformer.
+            num_classes (int): Number of track parameters to predict per sequence element.
+            num_heads (int): Number of attention heads to use in the Multi-Head Attention blocks.
+            num_layers (int): Number of Transformer encoder blocks to use.
+            lr (float): Learning rate for the optimizer.
+            warmup (int): Number of warmup steps, [50, 500].
+            max_iters (int): Maximum number of iterations the model is trained for, used by the CosineWarmup scheduler.
+            loss_type (str): Type of loss function to use, e.g., 'mse' for mean squared error or 'quantile' for quantile loss.
+            quantile (float, optional): Quantile value for quantile loss, if used. Default is 0.5.
+    """
 
     def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, lr, warmup, max_iters, loss_type, quantile = 0.5, dropout=0.0, input_dropout=0.0):
-        """
-        Inputs:
-            input_dim - Hidden dimensionality of the input
-            model_dim - Hidden dimensionality to use inside the Transformer
-            num_classes - Number of classes to predict per sequence element
-            num_heads - Number of heads to use in the Multi-Head Attention blocks
-            num_layers - Number of encoder blocks to use.
-            lr - Learning rate in the optimizer
-            warmup - Number of warmup steps. Usually between 50 and 500
-            max_iters - Number of maximum iterations the model is trained for. This is needed for the CosineWarmup scheduler
-            dropout - Dropout to apply inside the model
-            input_dropout - Dropout to apply on the input features
-        """
+
         super().__init__()
         self.save_hyperparameters()
         self._create_model()
-        self.loss_crit =  LossFunction(loss_type, quantile)
+        self.loss_crit =  LossFunction(self.hparams.loss_type, self.hparams.quantile)
 
     def _create_model(self):
-        # Input dim -> Model dim
-        self.input_net = nn.Sequential(
+        #  Embedding
+        self.embedding = nn.Sequential(
             nn.Dropout(self.hparams.input_dropout),
             nn.Linear(self.hparams.input_dim, self.hparams.model_dim),
-            nn.LeakyReLU(inplace=True),
-            nn.Linear(self.hparams.model_dim, self.hparams.model_dim)
+            # nn.LeakyReLU(inplace=True),
+            # nn.Linear(self.hparams.model_dim, self.hparams.model_dim)
         )
 
         # Positional encoding 
@@ -57,7 +64,7 @@ class TrackFormer(L.LightningModule):
             x - Input features [Batch, SeqLen, input_dim]
             mask - Mask to apply on the attention outputs 
         """
-        x = self.input_net(x)
+        x = self.embedding(x)
         if add_positional_encoding:
             x = self.positional_encoding(x)
         
@@ -92,8 +99,7 @@ class TrackFormer(L.LightningModule):
         inputs, mask, label, _ = batch
 
         preds = self(inputs, mask, add_positional_encoding=False)
-        # loss = self.loss_crit(preds.squeeze(), label.squeeze())
-        loss = torch.nn.L1Loss()(preds.squeeze(), label.squeeze())
+        loss = self.loss_crit(preds.squeeze(), label.squeeze())
         self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
         return loss
 

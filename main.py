@@ -23,7 +23,7 @@ def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, 
         limit_train_batches=train_batches,
         limit_val_batches=val_batches,
         limit_test_batches=test_batches,
-        log_every_n_steps=100,
+        log_every_n_steps=50,
         max_epochs=epochs,
         logger=logger,
         callbacks=ckpts,
@@ -37,7 +37,7 @@ def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, 
 @click.command()
 @click.option('--model_dim', type=int, default=128, help='Model dimension')
 @click.option('--num_heads', type=int, default=4, help='Number of attention heads')
-@click.option('--num_layers', type=int, default=6, help='Number of transformer layers')
+@click.option('--num_layers', type=int, default=4, help='Number of transformer layers')
 @click.option('--dropout', type=float, default=0.1, help='Dropout rate')
 @click.option('--lr', type=float, default=5e-4, help='Learning rate')
 @click.option('--warmup', type=int, default=100, help='Number of warmup steps')

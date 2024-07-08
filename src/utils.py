@@ -58,7 +58,7 @@ class OverfittingEarlyStopping(EarlyStopping):
 def experiment_name(exp):
     ckp = ModelCheckpoint(
                 dirpath=f"/content/aims_proj/saved_models/{exp}",
-                filename="best_model{epoch:02d}-{val_loss:.2f}",
+                filename="model-{epoch:02d}-{val_loss:.2f}",
                 save_top_k=1,
                 verbose=True,
                 monitor="val_loss",
