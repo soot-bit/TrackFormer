@@ -1,0 +1,3 @@
+[submodule "trackml-library"]
+	path = trackml-library
+	url = https://github.com/LAL/trackml-library.git
