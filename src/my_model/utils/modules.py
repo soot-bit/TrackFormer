@@ -4,8 +4,8 @@ from torch import softmax, nn, optim
 import torch
 import numpy as np
 from torch.nn.functional import mse_loss, l1_loss
-
-
+import lightning as L
+from abc import ABC, abstractmethod
 
 
 
@@ -27,47 +27,10 @@ def scaled_dot_product(q, k, v, mask=None):
     scale_factor = 1 / math.sqrt(q.size(-1))
     attn_weight = q @ k.transpose(-2, -1) * scale_factor
 
-
-
-    if mask is not None:
-        mask = mask.unsqueeze(1).unsqueeze(2)  # [Batch, 1, 1, SeqLen]
-        attn_weight = attn_weight.masked_fill(mask == 0, float("-inf"))   # this works well
-
-
-
-
     attention = torch.softmax(attn_weight, dim=-1)
-    if mask is not None:
-        attention = attention.permute(0,1,3,2).masked_fill(mask == 0,  0)
-        attention = attention.permute(0,1,3,2)
-    
     values = attention @ v
     return values, attention
 
-
-
-
-
-class LossFunction:
-    def __init__(self, loss_function: str = "qloss", quantile: float = 0.5):
-        self.quantile = quantile
-        self.loss_functions = {
-            "qloss": self.quantile_loss,
-            "mse": mse_loss,
-            "mae": l1_loss
-        }
-
-        if loss_function not in self.loss_functions:
-            raise ValueError("Invalid loss function. Choose either 'qloss', 'mse', or 'mae'.")
-        
-        self.loss_fn = self.loss_functions[loss_function]
-
-    def __call__(self, preds, targets):
-        return self.loss_fn(preds, targets)
-
-    def quantile_loss(self, preds, targets):
-        errors = targets - preds
-        return torch.mean(torch.max((self.quantile - 1) * errors, self.quantile * errors))
 
 
 
@@ -193,31 +156,6 @@ class TransformerEncoder(nn.Module):
 
 
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        """Positional Encoding.
-
-        Args:
-            d_model: Hidden dimensionality of the input.
-            max_len: Maximum length of a sequence to expect.
-        """
-        super().__init__()
-
-        # [SeqLen, HiddenDim] 
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-
-
-        self.register_buffer("pe", pe, persistent=False)
-
-    def forward(self, x):
-        x = x + self.pe[:, : x.size(1)]
-        return x
-
 
 
 class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
@@ -236,3 +174,74 @@ class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
         if epoch <= self.warmup:
             lr_factor *= epoch * 1.0 / self.warmup
         return lr_factor
+
+
+
+
+class Loss:
+    def __init__(self, mode='mse'):
+        super().__init__()
+        self.mode = mode
+        self.quantile = None
+        
+        if "qloss" in self.mode:
+            _, q = self.mode.split("-")
+            self.quantile = float(q)
+            self.loss_fn = self._quantile_loss
+        elif 'mse' in self.mode:
+            self.loss_fn = mse_loss
+        elif 'mae' in self.mode:  
+            self.loss_fn = l1_loss
+        else:
+            raise ValueError(f"Uknown loss funtion: {self.mode}")
+
+    def _quantile_loss(self, preds, targets):
+        errors = targets - preds
+        return torch.mean(torch.max((self.quantile - 1) * errors, self.quantile * errors))
+
+    def __call__(self, preds, targets):
+        return self.loss_fn(preds, targets)
+
+
+class BaseModel(L.LightningModule):
+    '''
+    Base LightningModule for training and evaluating models.
+    Optimiser args:
+        lr (float): Learning rate.
+        warmup (int): Number of warmup steps, [50, 500].
+        max_iters (int): Maximum number of iterations the model is trained for, used by the CosineWarmup scheduler.
+    Loss args:
+        loss_type (dic or str): Type of loss function 'mse', "mae' or 'qloss- q_value'.
+        quantile (float, optional): Quantile value for quantile loss, if used. Default is 0.5.
+    '''
+
+    def __init__(self, criterion, lr, max_iters, warmup):
+        super().__init__()
+        self.criterion = Loss(criterion)
+        self.save_hyperparameters()
+        
+    def configure_optimizers(self):
+        optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr)
+        lr_scheduler = CosineWarmupScheduler(optimizer,
+                                             warmup=self.hparams.warmup,
+                                             max_iters=self.hparams.max_iters)
+        return [optimizer], [{'scheduler': lr_scheduler, 'interval': 'step'}]
+
+    
+    def _calculate_loss(self, batch, mode="train"):
+
+        inputs, _, label = batch
+
+        preds = self(inputs)
+        loss = self.criterion(preds.squeeze(), label.squeeze())
+        self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
+        return loss
+
+    def training_step(self, batch, batch_idx):
+        return self._calculate_loss(batch, mode="train")
+
+    def validation_step(self, batch, batch_idx):
+        _ = self._calculate_loss(batch, mode="val")
+    
+    def test_step(self, batch, batch_idx):
+        _ = self._calculate_loss(batch, mode="test")

@@ -94,7 +94,7 @@ class _TrackIterable:
         x = torch.tensor([event.hits.x, event.hits.y], dtype=torch.float).T.contiguous()
         mask = torch.ones(x.shape[0], dtype=bool)
 
-        return x, mask, torch.tensor([pt], dtype=torch.float), event
+        return x, mask, torch.tensor([pt], dtype=torch.float)
 
 class ToyTrackWrapper(Dataset):
     
@@ -203,8 +203,8 @@ class ToyTrackDataModule(L.LightningDataModule):
     @staticmethod
     def collate_fn(ls):
         """Batch maker"""
-        x, mask, pt, events = zip(*ls)
-        return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze(), list(events)
+        x, mask, pt = zip(*ls)
+        return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze()
     
     
 
@@ -349,7 +349,7 @@ class TrackMLDataModule(L.LightningDataModule):
         inputs = pad_sequence(inputs, batch_first=True)
         masks = pad_sequence(masks, batch_first=True, padding_value=0)
 
-        return inputs, masks, torch.stack(targets, dim=0), None
+        return inputs, masks, torch.stack(targets, dim=0)
 
 
 
@@ -369,14 +369,14 @@ class TrackMLRAM(Dataset):
         return self.data[index]
 
 class TML_RAM_DataModule(L.LightningDataModule):
-    def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=15, pin_memory=True):
+    def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=15, pin_memory=False, persistence = False ):
         super().__init__()
         self.train_dir = train_dir
         self.test_dir = test_dir
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
-
+        self.persistence = persistence if num_workers > 1 else False
 
 
         if "train" not in global_TrackMLRAM:
@@ -389,16 +389,16 @@ class TML_RAM_DataModule(L.LightningDataModule):
         val_size = len(train_data) - self.train_size
         self.train_dataset, self.val_dataset = random_split(train_data, [self.train_size, val_size])
         self.test_dataset = global_TrackMLRAM["test"]
-        self.train_batches = self.train_size // self.batch_size
+        self.train_batches = self.train_size // self.batch_size 
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn,  persistent_workers=self.persistence)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn,  persistent_workers=self.persistence)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=self.pin_memory, collate_fn=self.TMLcollate_fn)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=self.TMLcollate_fn)
 
     @staticmethod
     def TMLcollate_fn(batch):
@@ -407,7 +407,7 @@ class TML_RAM_DataModule(L.LightningDataModule):
             inputs = pad_sequence(inputs, batch_first=True, padding_value=0)
             mask = pad_sequence(masks, batch_first=True, padding_value=False)
             targets = torch.stack(targets, dim=0)
-            return inputs, mask, targets, None
+            return inputs, mask, targets
 
 
 ################################################### Helper function:

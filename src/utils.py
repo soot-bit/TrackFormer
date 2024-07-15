@@ -4,10 +4,12 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from rich.console import Console
 from rich.table import Table
 from rich import print
+from src.my_model.transformer import TrackFormer
+from src.my_model.benchmarks import NeuralFit
 from src.datasets.datasets import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
 from rainbow_print import printr
 import datetime
-
+import lightning as L
 
 
 
@@ -25,7 +27,7 @@ class ParmSummary(Callback):
             table.add_row(name.capitalize(), str(value))
 
         
-        console.print("\n\n**[bold magenta]🤖Transformer Summary**[/bold magenta]")
+        console.print("\n\n**[bold magenta] 🤖Transformer Summary** [/bold magenta]")
         console.print(table)
         console.print("*" * 40)
 
@@ -55,12 +57,12 @@ class OverfittingEarlyStopping(EarlyStopping):
             self.increase_count = 0
             super().on_validation_end(trainer, pl_module)
 
-def experiment_name(exp):
+def experiment_name(exp, loss):
     ckp = ModelCheckpoint(
-                dirpath=f"/content/aims_proj/saved_models/{exp}",
+                dirpath=f"/content/aims_proj/saved_models/{exp}-{loss}",
                 filename="model-{epoch:02d}-{val_loss:.2f}",
                 save_top_k=1,
-                verbose=True,
+                verbose=False,
                 monitor="val_loss",
                 mode="min"
                 )
@@ -87,7 +89,7 @@ def stage_data(dm, num_workers, batch_size):
         num_classes, input_dim, train_batches, val_batch, test_batch = 2, 3, data_module_instance.train_batches, None, None
     elif dm == 'ToyTrack':
         data_module_instance = ToyTrackDataModule(num_workers=num_workers, batch_size=batch_size)
-        num_classes, input_dim, train_batches, val_batch, test_batch = 1, 2
+        num_classes, input_dim, train_batches, val_batch, test_batch = 1, 2, 500,  200, 100
     elif dm == "TML_RAM":
         data_module_instance = TML_RAM_DataModule(
             test_dir="/content/track-fitter/src/datasets/TML_datafiles/tml_hits_preprocessed_test.pt",
@@ -98,7 +100,31 @@ def stage_data(dm, num_workers, batch_size):
         num_classes, input_dim, train_batches, val_batch, test_batch = 2, 3, data_module_instance.train_batches, None, None
     return  data_module_instance, num_classes, input_dim, train_batches, val_batch, test_batch
 
+def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, epochs, train_batches, **kwargs):
+    """Train the models"""
+
     
+    if model == 'TrackFormer':
+        lighting_model = TrackFormer(max_iters=epochs*train_batches, **kwargs)
+    else:
+        lighting_model = NeuralFit(max_iters=epochs*train_batches, outputs = 1,  **kwargs)
+
+    log_steps = train_batches//100
+    # Trainer
+    trainer = L.Trainer(
+        limit_train_batches=train_batches,
+        limit_val_batches=val_batches,
+        limit_test_batches=test_batches,
+        log_every_n_steps=log_steps,
+        max_epochs=epochs,
+        logger=logger,
+        callbacks=ckpts,
+    )
+
+    trainer.logger._default_hp_metric = None
+    trainer.fit(lighting_model, data_module, ckpt_path="last")
+    return trainer, lighting_model
+
 summary = RichModelSummary()
 bar = RichProgressBar()
 hyper = ParmSummary()

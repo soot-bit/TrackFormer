@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import lightning as L
 import numba
+import plotly.graph_objects as go
 from torch.nn.functional import mse_loss
 from tqdm.notebook import tqdm
- 
+from src.my_model.utils.modules import BaseModel
 
 import numpy as np
 import torch
@@ -73,76 +74,43 @@ class CircleFit:
                             ###################################
                             #       Neural Networks           #
                             ###################################
-class DeepNetwork(nn.Module):
-    def __init__(self, input_dim, hidden_d, output_dim):
-        super().__init__()
-
-        self.input_layer = nn.Linear(input_dim, 512)
-        self.hidden_layers = nn.ModuleList([nn.Linear(512, 512) for _ in range(hidden_d)])
-        self.output_layer = nn.Linear(512, output_dim)
-        self.dropout = nn.Dropout(0.1)
-
-    def forward(self, x):
-        x = torch.relu(self.input_layer(x))
-        for layer in self.hidden_layers:
-            x = torch.relu(layer(x))
-            x = self.dropout(x)
-        x = self.output_layer(x)
-        return x
 
 class ComplexNet(nn.Module):
-    def __init__(self, input_size = 20, output_size = 1, hidden_sizes=(128, 64, 32)):
+    def __init__(self, input_size=20, output_size=1, hidden_layers=(128, 64, 32)):
         super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(input_size, hidden_sizes[0]),
-            nn.ReLU(),
-            nn.Linear(hidden_sizes[0], hidden_sizes[1]),
-            nn.ReLU(),
-            nn.Linear(hidden_sizes[1], hidden_sizes[2]),
-            nn.ReLU(),
-            nn.Linear(hidden_sizes[2], output_size)
-        )
 
+        layers = []
+        prev_size = input_size
+        for hidden_size in hidden_layers:
+            layers.extend([
+                nn.Linear(prev_size, hidden_size),
+                nn.ReLU()
+            ])
+            prev_size = hidden_size
 
-    def forward(self, x):
-        return self.model(x)
+        # Output layer
+        layers.append(nn.Linear(prev_size, output_size))
 
-
-
-class MLP(L.LightningModule):
-    def __init__(self):
-        super().__init__()
-        self.model = ComplexNet()
-
+        self.model = nn.Sequential(*layers)
 
     def forward(self, x):
         x = x.flatten(-2, -1)
         x = self.model(x)
         return x
 
-    def _calculate_loss(self, batch, mode: str):
-        inp_data,_, labels,_ = batch
-        preds = self(inp_data)
-        loss = mse_loss(preds.squeeze(), labels[:,].squeeze())
-
-        # Log
-        self.log(f"{mode}_loss", loss, on_step=True, prog_bar=True, logger=True, batch_size=labels.numel())
-        return loss
-
-    def training_step(self, batch, batch_idx):
-        return self._calculate_loss(batch, mode="train")
+class NeuralFit(BaseModel):
+    def __init__(self, criterion, lr, max_iters, warmup, **kwargs):
+        super().__init__(criterion, lr, max_iters, warmup)
+        self.save_hyperparameters()
+        self.model = ComplexNet(**kwargs)
 
 
-    def validation_step(self, batch, batch_idx):
-        return self._calculate_loss(batch, mode="val")
-
-    def test_step(self, batch, batch_idx):
-        return self._calculate_loss(batch, mode="test")
+    def forward(self, x):
+        preds = self.model(x)
+        return preds
 
 
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=1e-3)  # L2
-        return optimizer
+
 
 
 
@@ -220,56 +188,6 @@ class MLP(L.LightningModule):
 # print(f"Conformal MAE: {pt_conf_mean:.4f} ± {pt_conf_delta:.4f}")
 
 
-
-import numpy as np
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-
-def plot_aggregated_attention_maps(input_data, attn_maps, idx=0, display_labels=False, concat_heads=False):
-    """
-    Plot aggregated attention maps from all heads for each layer.
-
-    Parameters:
-    input_data (array-like): The input data to the transformer model.
-    attn_maps (list): A list of attention maps from each layer.
-    idx (int): The index of the example from the batch to visualize. Default is 0.
-    display_labels (bool): Whether to display labels on the axes. Default is False.
-    concat_heads (bool): Whether to concatenate the attention heads or average them. Default is False (average).
-    """
-    # Process input data
-    if input_data is not None:
-        input_data = input_data[idx].detach().cpu().numpy()
-    else:
-        input_data = np.arange(attn_maps[0][idx].shape[-1])
-
-    # Extract and aggregate attention maps for each layer
-    attn_maps = [m[idx].detach().cpu().numpy() for m in attn_maps]
-    if concat_heads:
-        aggregated_attn_maps = [np.concatenate(m, axis=0) for m in attn_maps]  # Concatenate across heads
-    else:
-        aggregated_attn_maps = [np.mean(m, axis=0) for m in attn_maps]  # Average across all heads
-
-    num_layers = len(attn_maps)
-    seq_len = input_data.shape[0]
-    fig_size = 4
-    fig, ax = plt.subplots(1, num_layers, figsize=(num_layers*fig_size, fig_size))
-    if num_layers == 1:
-        ax = [ax]
-
-    for layer in range(num_layers):
-        ax[layer].imshow(aggregated_attn_maps[layer], origin='lower', vmin=0)
-        if display_labels:
-            ax[layer].set_xticks(list(range(seq_len)))
-            ax[layer].set_xticklabels(input_data.tolist(), fontsize=6)
-            ax[layer].set_yticks(list(range(seq_len)))
-            ax[layer].set_yticklabels(input_data.tolist(), fontsize=6)
-        ax[layer].set_title(f"Layer {layer+1}", fontsize=8)
-    fig.subplots_adjust(hspace=0.5, wspace=0.5)
-    if concat_heads:
-        plt.savefig('concatenated_attention_maps.svg', format='svg')
-    else:
-        plt.savefig('aggregated_attention_maps.svg', format='svg')
-    plt.show()
 
 
 def view_trajectory(inputs, mask=None):
