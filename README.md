@@ -7,7 +7,7 @@
 
 ## Overview
 
-TrackFormer is our novel approach to particle trajectory reconstruction using transformer-inspired architecture. By leveraging the powerful self-attention mechanism of Transformers, this model is able to effectively capture complex dependencies in particle event data, leading to improved accuracy and efficiency in track fitting tasks.
+TrackFormer is a unique solution to particle trajectory reconstruction that employs transformer-inspired design. Using Transformers' powerful self-attention mechanism, this model successfully performs track fitting, resulting in better accuracy and efficiency.
 
 ## Features
 
