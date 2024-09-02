@@ -11,10 +11,10 @@ TrackFormer is our novel approach to particle trajectory reconstruction using tr
 
 ## Features
 
-- **Transformer-based Architecture**: Our model utilizes a Transformer-based network, allowing efficient and accurate particle track reconstruction.
-- **PyTorch Lightning Integration**: The project is built using PyTorch Lightning, a high-level deep learning framework that simplifies model training and evaluation.
-- **Modular Design**: The codebase is designed in a modular fashion, making it easy to experiment with different model architectures, loss functions, and training strategies.
-- **Comprehensive Logging and Visualization**: The training process is accompanied by detailed logging and visualization capabilities, powered by TensorBoard and other tools
+- **Transformer-based Architecture**: For fast efficient and accurate particle track reconstruction.
+- **PyTorch Lightning Integration**:
+- **Modular Design**: 
+- **Comprehensive Logging and Visualization**:
 
 ## Getting Started
 
