@@ -22,8 +22,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 @click.option('--model', type=click.Choice(['NN', 'TrackFormer']), help='MLP or tansformer')
 def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, dataset, num_workers, batch_size, loss_fn, model):
     """Main function"""
-
-
+    
     # Experiment
     ckp, logger = experiment_name(exp_name,loss_fn )
     call = callbacks_list + ckp
