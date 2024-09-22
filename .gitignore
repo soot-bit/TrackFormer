@@ -1,4 +1,5 @@
 saved_models
 lightning_logs
 /src/datasets/TML_datafiles/
-__pycache__/
+**__pycache__/
+main.py
