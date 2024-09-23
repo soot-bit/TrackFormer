@@ -19,5 +19,5 @@ TrackFormer is a unique solution to particle trajectory reconstruction that empl
 ## Getting Started
 
 1. **Clone the repository**:
-2. download datasets to Data directory
-3. `./split_dataset.sh /path/to/dataset 0.7 0.2 0.1`
+2. download datasets to specific directory in Data
+3. train, test split dataset  with `datmaker.sh /path/to/dataset 80 10 10`
