@@ -20,3 +20,4 @@ TrackFormer is a unique solution to particle trajectory reconstruction that empl
 
 1. **Clone the repository**:
 2. download datasets to Data directory
+3. `./split_dataset.sh /path/to/dataset 0.7 0.2 0.1`
