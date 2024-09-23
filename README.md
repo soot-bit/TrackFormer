@@ -19,3 +19,4 @@ TrackFormer is a unique solution to particle trajectory reconstruction that empl
 ## Getting Started
 
 1. **Clone the repository**:
+2. download datasets to Data directory
