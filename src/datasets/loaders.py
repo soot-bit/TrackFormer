@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 
-class Acts:
+class ActsLoader:
     def __init__(self, folder="scv"):
         self.folder = Path.cwd() / folder
         self.file_types = ["spacepoint.csv", "particles.csv", "parameters.csv", "tracks.csv"]

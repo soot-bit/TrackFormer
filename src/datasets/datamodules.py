@@ -3,7 +3,8 @@ from torch.utils.data import  random_split, DataLoader, Dataset, IterableDataset
 import torch
 import math
 import os
-from rich import console
+from rich.console import Console
+console = Console()
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
 import numpy as np
 from tqdm.notebook import tqdm
@@ -13,7 +14,6 @@ from pathlib import Path
 import random
 from trackml.dataset import load_dataset, load_event
 import pandas as pd
-from src.datasets.loaders import EventManager
 
 
 
@@ -217,12 +217,12 @@ class IterBase(IterableDataset):
         folder (Path): directory containing dataset.
     """
 
-    def __init__(self, folder = "csv"):
-        self.folder = folder
+    def __init__(self, directory, folder = "csv"):
+        self.path = Path(directory) if directory else Path.cwd() / "Data/Acts" / folder
         self.start, self.end = self._event_range()
 
     def _event_range(self):
-        files = sorted(self.data_path.glob('*'))
+        files = sorted(self.path.glob('*'))
 
         event_numbers = [ int(file.stem.split('-')[0][5:]) for file in files if file.is_file() ]
 
@@ -466,14 +466,13 @@ def extract_data(data_path):
 class ActsDataset(IterBase):
     
     def __init__(self, folder="csv", directory=None):
-        super().__init__(folder)
-        self.path = Path(directory) if directory else Path.cwd() / "Data/Acts"
+        super().__init__(directory, folder)
 
     def _load_event(self, event_prefix):
-        parameters = self.path / self.folder / f'{event_prefix}-parameters.csv'
-        particles = self.path / self.folder / f'{event_prefix}-particles.csv'
-        spacepoints = self.path / self.folder / f'{event_prefix}-spacepoint.csv'
-        tracks = self.path / self.folder / f'{event_prefix}-tracks.csv'
+        parameters = self.path / f'{event_prefix}-parameters.csv'
+        particles = self.path / f'{event_prefix}-particles.csv'
+        spacepoints = self.path /  f'{event_prefix}-spacepoint.csv'
+        tracks = self.path /  f'{event_prefix}-tracks.csv'
         return  (pd.read_csv(spacepoints), 
                 pd.read_csv(tracks), 
                 pd.read_csv(particles), 
@@ -487,11 +486,11 @@ class ActsDataset(IterBase):
             event_prefix (str): The event to preprocess.
         """
         #files
-        spacepoints, tracks, _,_ = event_files
-        xyz = torch.tensor(spacepoints[["x", "y", "z"]])
-        pt = torch.tensor(tracks[["pT"]])
+        spacepoints, tracks, _, _ = event_files
+        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values)
+        pt = torch.tensor(tracks[["pT"]].values)
 
-        return xyz, xyz.shape[0], pt 
+        yield xyz, torch.ones(xyz.shape[0], dtype=bool), pt 
 
 
 class ActsDataModule(L.LightningDataModule):
