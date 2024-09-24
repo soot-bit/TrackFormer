@@ -1,18 +1,19 @@
 from typing import Optional, Union, List
-from torch.utils.data import TensorDataset, Subset, random_split, DataLoader, Dataset, IterableDataset
+from torch.utils.data import  random_split, DataLoader, Dataset, IterableDataset, get_worker_info
 import torch
+import math
+import os
+from rich import console
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
 import numpy as np
 from tqdm.notebook import tqdm
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
-from rainbow_print import printr
-import os
-import shutil
-import math
+from pathlib import Path
 import random
 from trackml.dataset import load_dataset, load_event
 import pandas as pd
+from src.datasets.loaders import EventManager
 
 
 
@@ -143,7 +144,7 @@ class ToyTrackDataModule(L.LightningDataModule):
 
         if use_wrapper:
             self.dataset = ToyTrackWrapper(wrapper_size)
-            printr(f"**Using TracksDatasetWrapper size:: {len(self.dataset)}**")
+            console.rule(f"ToyTrack {len(self.dataset)} events")
             train_len = int(len(self.dataset) * 0.6)
             val_len = int(len(self.dataset) * 0.2)
             test_len = len(self.dataset) - self.train_len - val_len
@@ -159,7 +160,6 @@ class ToyTrackDataModule(L.LightningDataModule):
 
 
         if isinstance(self.dataset, ToyTrackWrapper):
-            printr(f"**Using TracksDatasetWrapper size:: {len(self.dataset)}**")
             self.train_len = int(len(self.dataset) * 0.6)
             val_len = int(len(self.dataset) * 0.2)
             test_len = len(self.dataset) - self.train_len - val_len
@@ -167,12 +167,12 @@ class ToyTrackDataModule(L.LightningDataModule):
                 self.dataset, [self.train_len, val_len, test_len]
             )
         elif isinstance(self.dataset, ToyTrackDataset):
-            printr("**Using infinite TracksDataset***")
+            console.rule("ToyTrack")
             self.train_dataset = self.dataset
             self.val_dataset = self.dataset
             self.test_dataset = self.dataset
         else:
-            printr("Unknown dataset type:", type(self.dataset))
+            console.rule("Unknown dataset type:", type(self.dataset))
 
     def train_dataloader(self):
         return DataLoader(
@@ -207,68 +207,82 @@ class ToyTrackDataModule(L.LightningDataModule):
         return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze()
     
     
+############################################ BASE CLASSES:
 
 
-########################################### TML dataset:
+class IterBase(IterableDataset):
+    """ Iterable Base class for TrackML and ACTS datasets.
 
+    Attributes:
+        folder (Path): directory containing dataset.
+    """
 
-#######################data_module
-# Iterable class of 
-
-class TrackMLIterableDataset(IterableDataset):
-    """ Iterable class for TrackML with option to load into ram """
-
-    def __init__(self, data_path):
-        self.data_path = data_path
+    def __init__(self, folder = "csv"):
+        self.folder = folder
         self.start, self.end = self._event_range()
 
     def _event_range(self):
-        files = os.listdir(self.data_path)
-        files.sort()
-        if files:
-            return int(files[0].split('-')[0][5:]), int(files[-1].split('-')[0][5:]) + 1
-        else:
-            raise FileNotFoundError("Uh-oh!, looks like the files are on vacation...")
+        files = sorted(self.data_path.glob('*'))
 
+        event_numbers = [ int(file.stem.split('-')[0][5:]) for file in files if file.is_file() ]
 
+        if not event_numbers:
+            raise FileNotFoundError("Uh-oh! Looks like the files are on vacation...")
+
+        return min(event_numbers), max(event_numbers) 
+
+    def _preprocessor(self, event: str):
+        raise NotImplementedError("Implement preprocessing logic...")
+    def _load_event(self, eventfiles: str):
+        raise NotImplementedError("Implement loading logic.....")
+        
 
     def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info is None:  # single-process data loading,
+        worker_info = get_worker_info()
+        if worker_info is None:  # Single-process 
             iter_start = self.start
             iter_end = self.end
         else:
-            # split workload
+            # Split workload among workers
             per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
             worker_id = worker_info.id
             iter_start = self.start + worker_id * per_worker
             iter_end = min(iter_start + per_worker, self.end)
 
         for i in range(iter_start, iter_end):
-            event = f'event00000{i:02d}'
+            event = f'event{i:09d}'
+            event_files = self._load_event(event)
+            yield from self._preprocessor(event_files)
 
-            path = os.path.join(self.data_path, event)
+########################################### TML dataset:
 
-            hits, cells, particles, truth = load_event(path)
-            particles = particles[particles['nhits'] >= 5]
-            merged_df = pd.merge(truth, particles, on='particle_id')
-            merged_df = pd.merge(merged_df, hits, on='hit_id')
 
-            merged_df['pT'] = np.sqrt(merged_df['px']**2 + merged_df['py']**2)
 
-            grouped = merged_df.groupby('particle_id')
+class TrackMLDataset(IterBase):
+    """ Iterable class for TrackML with option to load into ram """
+    def preprocessor(self, path):
+        hits, cells, particles, truth = load_event(path)
+        particles = particles[particles['nhits'] >= 5]
+        merged_df = pd.merge(truth, particles, on='particle_id')
+        merged_df = pd.merge(merged_df, hits, on='hit_id')
 
-            for particle_id, group in grouped:
-                inputs = group[['tx', 'ty', 'tz']].values
-                target = group[['pT', 'pz']].values[0]
+        merged_df['pT'] = np.sqrt(merged_df['px']**2 + merged_df['py']**2)
 
-                zxy = torch.tensor(inputs, dtype=torch.float32)
-                target_tensor = torch.tensor(target, dtype=torch.float32)
+        grouped = merged_df.groupby('particle_id')
 
-                x, y, z = zxy[:, 0], zxy[:, 1], zxy[:, 2]
+        for particle_id, group in grouped:
+            inputs = group[['tx', 'ty', 'tz']].values
+            target = group[['pT', 'pz']].values[0]
 
-                mask = torch.ones(zxy.shape[0], dtype=torch.bool)
-                yield (zxy, mask, target_tensor)
+            zxy = torch.tensor(inputs, dtype=torch.float32)
+            target_tensor = torch.tensor(target, dtype=torch.float32)
+
+            x, y, z = zxy[:, 0], zxy[:, 1], zxy[:, 2]
+
+            mask = torch.ones(zxy.shape[0], dtype=torch.bool)
+            yield (zxy, mask, target_tensor)
+
+
 
 
 class TrackMLDataModule(L.LightningDataModule):
@@ -278,40 +292,22 @@ class TrackMLDataModule(L.LightningDataModule):
         num_workers: int = 0,
         persistence: bool = False,
         data_path: str = "/content/track-fitter/src/datasets",
-        ram_path: str = "/dev/shm/MyData",
-        use_ram = False
+
 
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.persistence = persistence if num_workers == 0 else True
+        self.persistence = False if num_workers == 0 else persistence
         self.data_path = data_path
-        self.ram_path = ram_path
-        self.use_ram = use_ram
-        
-        
-        self._to_ram() if  self.use_ram else None
-
-
-    def _to_ram(self):
-        try:
-            shutil.copytree(self.data_path, self.ram_path)
-            printr("Data copied successfully to RAM...")
-        except Exception as e:
-            if "File exists:" in str(e):
-                pass
-            else:
-                raise RuntimeError (f"Ohh my: {e}")
-
 
 
     def setup(self, stage=None):
-        printr("***Using TrackML iterable dataset Dataset****")
+        console.rule("TrackML Streamlined Preprocessing")
         data_path = self.ram_path if self.use_ram else self.data_path
-        self.train_dataset = TrackMLIterableDataset(os.path.join(data_path, "train"))
-        self.val_dataset = TrackMLIterableDataset(os.path.join(data_path, "val"))
-        self.test_dataset = TrackMLIterableDataset(os.path.join(data_path, "test"))
+        self.train_dataset = TrackMLDataset(os.path.join(data_path, "train"))
+        self.val_dataset = TrackMLDataset(os.path.join(data_path, "val"))
+        self.test_dataset = TrackMLDataset(os.path.join(data_path, "test"))
 
     def train_dataloader(self):
         return DataLoader(
@@ -463,3 +459,96 @@ def extract_data(data_path):
     # Save 
     torch.save(train_data, "/content/TML_datafiles/tml_hits_preprocessed_train.pt")
     torch.save(test_data, "/content/TML_datafiles/tml_hits_preprocessed_test.pt")
+
+
+
+########################## ACTS data:
+class ActsDataset(IterBase):
+    
+    def __init__(self, folder="csv", directory=None):
+        super().__init__(folder)
+        self.path = Path(directory) if directory else Path.cwd() / "Data/Acts"
+
+    def _load_event(self, event_prefix):
+        parameters = self.path / self.folder / f'{event_prefix}-parameters.csv'
+        particles = self.path / self.folder / f'{event_prefix}-particles.csv'
+        spacepoints = self.path / self.folder / f'{event_prefix}-spacepoint.csv'
+        tracks = self.path / self.folder / f'{event_prefix}-tracks.csv'
+        return  (pd.read_csv(spacepoints), 
+                pd.read_csv(tracks), 
+                pd.read_csv(particles), 
+                pd.read_csv(parameters))
+
+
+    def _preprocessor(self, event_files: pd.DataFrame):
+        """Preprocesses data for the specified event.
+
+        Args:
+            event_prefix (str): The event to preprocess.
+        """
+        #files
+        spacepoints, tracks, _,_ = *event_files
+        xyz = torch.tensor(spacepoints[["x", "y", "z"]])
+        pt = torch.tensor(tracks[["pT"]])
+
+        return xyz, xyz.shape[0], pt 
+
+
+class ActsDataModule(L.LightningDataModule):
+    def __init__(
+        self,
+        batch_size: int = 20,
+        num_workers: int = 0,
+        persistence: bool = False
+
+    ):
+        super().__init__()
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.persistence = False if num_workers == 0 else persistence
+
+
+
+    def setup(self, stage=None):
+        console.rule("ACTS Streamlined Preprocessing")
+        self.train_dataset = ActsDataset(folder = "train")
+        self.val_dataset = ActsDataset(folder = "val")
+        self.test_dataset = ActsDataset(folder = "test")
+    
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self.ACTScollate_fn,
+            persistent_workers=self.persistence
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self.ACTScollate_fn,
+            persistent_workers=self.persistence
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            collate_fn=self.ACTScollate_fn,
+            num_workers=self.num_workers,
+            persistent_workers=self.persistence
+        )
+
+
+
+    @staticmethod
+    def ACTScollate_fn(batch):
+        inputs, masks, targets = zip(*batch)
+
+        inputs = pad_sequence(inputs, batch_first=True)
+        masks = pad_sequence(masks, batch_first=True, padding_value=0)
+
+        return inputs, masks, torch.stack(targets, dim=0)

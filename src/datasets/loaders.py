@@ -1,9 +1,8 @@
 from pathlib import Path
-import os 
 import pandas as pd
 
-class EventManager:
-    def __init__(self, folder="csv"):
+class Acts:
+    def __init__(self, folder="scv"):
         self.folder = Path.cwd() / folder
         self.file_types = ["spacepoint.csv", "particles.csv", "parameters.csv", "tracks.csv"]
 
