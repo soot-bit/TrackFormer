@@ -487,7 +487,7 @@ class ActsDataset(IterBase):
             event_prefix (str): The event to preprocess.
         """
         #files
-        spacepoints, tracks, _,_ = *event_files
+        spacepoints, tracks, _,_ = event_files
         xyz = torch.tensor(spacepoints[["x", "y", "z"]])
         pt = torch.tensor(tracks[["pT"]])
 

@@ -17,9 +17,9 @@ from lightning.pytorch.loggers import TensorBoardLogger
 @click.option('--exp_name', type=str, required=True, help='Name the experiment')
 @click.option('--dataset',  required=True, type=click.Choice(["ToyTrack", "TrackML", "TML_RAM"]), help='Choose the dataset..')
 @click.option('--loss_fn', required=True, type=str, help='Choose the loss function..[mse,mae, qloss-0.5]')
-@click.option('--num_workers', type=int, default=15, help='Number of workers for data loading')
+@click.option('--num_workers', type=int, default=4, help='Number of workers for data loading')
 @click.option('--batch_size', type=int, default=200, help='Batch size for training')
-@click.option('--model', type=click.Choice(['NN', 'TrackFormer']), help='MLP or tansformer')
+@click.option('--model', type=click.Choice([ 'TrackFormer', 'NN']), help='MLP or tansformer')
 def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_batches, exp_name, dataset, num_workers, batch_size, loss_fn, model):
     """Main function"""
     
@@ -49,8 +49,7 @@ def main(model_dim, num_heads, num_layers, dropout, lr, warmup, epochs, train_ba
         warmup=warmup,
         criterion=loss_fn
     )
-    
-    # Train 
+
    
     # Test on best model
     test_results = trainer.test(datamodule=data_module, ckpt_path="best", verbose=1)

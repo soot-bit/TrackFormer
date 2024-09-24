@@ -6,7 +6,7 @@ from rich.table import Table
 from rich import print
 from src.my_model.transformer import TrackFormer
 from src.my_model.benchmarks import NeuralFit
-from src.datasets.datasets import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
+from src.datasets.datamodules import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
 from rainbow_print import printr
 import datetime
 import lightning as L
@@ -59,14 +59,14 @@ class OverfittingEarlyStopping(EarlyStopping):
 
 def experiment_name(exp, loss):
     ckp = ModelCheckpoint(
-                dirpath=f"/content/aims_proj/saved_models/{exp}-{loss}",
+                dirpath=f"./content/aims_proj/saved_models/{exp}-{loss}",
                 filename="model-{epoch:02d}-{val_loss:.2f}",
                 save_top_k=1,
                 verbose=False,
                 monitor="val_loss",
                 mode="min"
                 )
-    logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name=f"{exp}")
+    logger = TensorBoardLogger(save_dir="./content/aims_proj/lightning_logs/", name=f"{exp}")
     return [ckp] , logger
 
 timer = Timer()
