@@ -5,3 +5,4 @@ Data/*
 notebooks
 trackml-library/
 acts.py
+wandb
