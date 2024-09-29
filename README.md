@@ -12,9 +12,9 @@ TrackFormer is a unique solution to particle trajectory reconstruction that empl
 ## Features
 
 - **Transformer-based Architecture**: For fast efficient and accurate particle track reconstruction.
-- **PyTorch Lightning Integration**:
+- **Built with Lightning Integration**:
 - **Modular Design**: 
-- **Comprehensive Logging and Visualization**:
+- **Logging and CLI integration**:
 
 ## Getting Started
 
