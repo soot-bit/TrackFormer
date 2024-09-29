@@ -1,0 +1,27 @@
+Traceback (most recent call last):
+  File "/home/oepeng_aims_ac_za/Code/TrackFormer/main.py", line 12, in <module>
+    cli_main()
+  File "/home/oepeng_aims_ac_za/Code/TrackFormer/main.py", line 8, in cli_main
+    cli = LightningCLI()
+          ^^^^^^^^^^^^^^
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/cli.py", line 394, in __init__
+    self._run_subcommand(self.subcommand)
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/cli.py", line 701, in _run_subcommand
+    fn(**fn_kwargs)
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/trainer/trainer.py", line 538, in fit
+    call._call_and_handle_interrupt(
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/trainer/call.py", line 47, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/trainer/trainer.py", line 574, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/trainer/trainer.py", line 943, in _run
+    call._call_setup_hook(self)  # allow user to set up LightningModule in accelerator environment
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/trainer/call.py", line 103, in _call_setup_hook
+    _call_callback_hooks(trainer, "setup", stage=fn)
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/trainer/call.py", line 218, in _call_callback_hooks
+    fn(trainer, trainer.lightning_module, *args, **kwargs)
+  File "/home/oepeng_aims_ac_za/.local/lib/python3.12/site-packages/lightning/pytorch/cli.py", line 262, in setup
+    raise RuntimeError(
+RuntimeError: SaveConfigCallback expected ./config.yaml to NOT exist. Aborting to avoid overwriting results of a previous run. You can delete the previous config file, set `LightningCLI(save_config_callback=None)` to disable config saving, or set `LightningCLI(save_config_kwargs={"overwrite": True})` to overwrite the config file.

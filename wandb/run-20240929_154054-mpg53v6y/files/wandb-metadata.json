@@ -1,0 +1,49 @@
+{
+  "os":  "Linux-6.10.11-100.fc39.x86_64-x86_64-with-glibc2.38",
+  "python":  "3.12.6",
+  "startedAt":  "2024-09-29T15:40:54.143069Z",
+  "args":  [
+    "fit",
+    "--config",
+    "configs/tformer.yaml",
+    "--config",
+    "configs/trainer.yaml"
+  ],
+  "program":  "/home/oepeng_aims_ac_za/Code/TrackFormer/main.py",
+  "codePath":  "main.py",
+  "git":  {
+    "remote":  "https://github.com/soot-bit/TrackFormer.git",
+    "commit":  "677756a85545c096e604e25ad6bdab0970e88c59"
+  },
+  "email":  "03peng@gmail.com",
+  "root":  ".",
+  "host":  "facts.us-west4-a.c.my-colab-99752.internal",
+  "username":  "oepeng_aims_ac_za",
+  "executable":  "/usr/bin/python",
+  "codePathLocal":  "main.py",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "gpu":  "[]",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "127688245248",
+      "used":  "12130639872"
+    }
+  },
+  "memory":  {
+    "total":  "33641213952"
+  },
+  "cpu":  {
+    "count":  8,
+    "countLogical":  16
+  },
+  "gpu_nvidia":  [
+    {
+      "memoryTotal":  "16106127360",
+      "cudaCores":  2560,
+      "architecture":  "Turing"
+    }
+  ],
+  "cudaVersion":  "12.6"
+}

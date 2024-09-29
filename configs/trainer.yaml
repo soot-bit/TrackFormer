@@ -2,7 +2,11 @@ trainer:
   accelerator: auto
   strategy: auto
   devices: auto
-  logger: null
+  logger: 
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      name: "testing"
+      project: TrackFormer
   callbacks: null
   precision: "32"
   max_epochs: 2
