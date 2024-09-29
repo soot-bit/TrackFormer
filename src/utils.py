@@ -46,7 +46,7 @@ class OverfittingEarlyStopping(EarlyStopping):
             raise ValueError(f"Early stopping conditioned on metric '{self.monitor}' which is not available.")
         
         if current_val_loss >= self.last_loss:
-            printr("it might be overfitting")
+            print("it might be overfitting")
             self.increase_count += 1
             if self.increase_count > self.patience:
                 trainer.should_stop = True
