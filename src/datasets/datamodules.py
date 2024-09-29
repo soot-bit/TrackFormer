@@ -252,7 +252,10 @@ class IterBase(IterableDataset):
         for i in range(iter_start, iter_end):
             event = f'event{i:09d}'
             event_files = self._load_event(event)
-            yield from self._preprocessor(event_files)
+            processed_data = self._preprocessor(event_files) 
+            if processed_data is None:
+                continue
+            yield processed_data
 
 ########################################### TML dataset:
 
@@ -466,9 +469,12 @@ def extract_data(data_path):
 class ActsDataset(IterBase):
     
     def __init__(self, folder="csv", directory=None):
+        self.event = 0
         super().__init__(directory, folder)
+        
 
     def _load_event(self, event_prefix):
+        self.event = event_prefix
         parameters = self.path / f'{event_prefix}-parameters.csv'
         particles = self.path / f'{event_prefix}-particles.csv'
         spacepoints = self.path /  f'{event_prefix}-spacepoint.csv'
@@ -479,7 +485,7 @@ class ActsDataset(IterBase):
                 pd.read_csv(parameters))
 
 
-    def _preprocessor(self, event_files: pd.DataFrame):
+    def _preprocessor(self, event_files):
         """Preprocesses data for the specified event.
 
         Args:
@@ -487,10 +493,13 @@ class ActsDataset(IterBase):
         """
         #files
         spacepoints, tracks, _, _ = event_files
-        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values)
-        pt = torch.tensor(tracks[["pT"]].values)
+        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values, dtype=torch.float32)
+        pt = tracks["pT"].values
+        if pt.size == 0: 
+            return None
+        pt = torch.tensor(pt, dtype=torch.float32)
 
-        yield xyz, torch.ones(xyz.shape[0], dtype=bool), pt 
+        return xyz, torch.ones(xyz.shape[0], dtype=bool), pt 
 
 
 class ActsDataModule(L.LightningDataModule):
