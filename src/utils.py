@@ -1,4 +1,3 @@
-
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping, Timer, ModelSummary, Callback, RichProgressBar, RichModelSummary, TQDMProgressBar
 from lightning.pytorch.loggers import TensorBoardLogger
 from rich.console import Console
@@ -28,12 +27,12 @@ class ParmSummary(Callback):
         
         console.print("\n\n**[bold magenta]🤖Transformer** [/bold magenta]")
         console.print(table)
-        console.print("*" * 40)
+        console.print("*" * 100)
 
 
 class OverfittingEarlyStopping(EarlyStopping):
     """Early stopping to prevent overfiting"""
-    
+   
     def __init__(self, monitor='val_loss', patience=15, min_delta=0.0001, verbose=True, mode='min'):
         super().__init__(monitor=monitor, patience=patience, min_delta=min_delta, verbose=verbose, mode=mode)
         self.last_loss = float('inf')
@@ -124,7 +123,6 @@ def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, 
     trainer.fit(lighting_model, data_module, ckpt_path="last")
     return trainer, lighting_model
 
-summary = RichModelSummary()
 bar = RichProgressBar()
 hyper = ParmSummary()
 lr_monitor = LearningRateMonitor(logging_interval="epoch")
