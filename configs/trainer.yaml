@@ -1,0 +1,11 @@
+trainer:
+  accelerator: auto
+  strategy: auto
+  devices: auto
+  logger: null
+  callbacks: null
+  precision: "32"
+  max_epochs: 2
+  limit_train_batches: 10
+  limit_val_batches: 2
+ckpt_path: "last"
