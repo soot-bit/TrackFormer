@@ -7,7 +7,6 @@ from rich import print
 from src.my_model.transformer import TrackFormer
 from src.my_model.benchmarks import NeuralFit
 from src.datasets.datamodules import ToyTrackDataModule, TrackMLDataModule, TML_RAM_DataModule
-from rainbow_print import printr
 import datetime
 import lightning as L
 
@@ -27,7 +26,7 @@ class ParmSummary(Callback):
             table.add_row(name.capitalize(), str(value))
 
         
-        console.print("\n\n**[bold magenta] 🤖Transformer Summary** [/bold magenta]")
+        console.print("\n\n**[bold magenta]🤖Transformer** [/bold magenta]")
         console.print(table)
         console.print("*" * 40)
 
