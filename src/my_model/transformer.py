@@ -16,16 +16,16 @@ class TrackFormer(BaseModel):
         It takes in a sequence of track-related  hits (B, seqL, 3 or 2) and outputs a sequence of 
         track parameter predictions, such as the track position, momentum, and other relevant quantities.
 
-        Args:
-            input_dim (int): Dimensionality of hits .
-            model_dim (int): Hidden dimensionality to use inside the Transformer.
-            num_classes (int): Number of track parameters to predict per sequence element.
-            num_heads (int): Number of attention heads to use in the Multi-Head Attention blocks.
-            num_layers (int): Number of Transformer encoder blocks to use.
+        Args (int):
+            input_dim : Dimensionality of hits .
+            model_dim : Hidden dimensionality to use inside the Transformer.
+            num_classes : Number of track parameters to predict per sequence element.
+            num_heads : Number of attention heads to use in the Multi-Head Attention blocks.
+            num_layers : Number of Transformer encoder blocks to use.
     """
 
     def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, criterion, max_iters,
-                     warmup, lr, dropout=0.0, input_dropout=0.0 ):
+                     warmup, lr, dropout=0.0, input_dropout=0.0):
         super().__init__(criterion, max_iters, warmup, lr)
         self.save_hyperparameters()
         self._create_model()
