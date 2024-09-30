@@ -1,4 +1,4 @@
-from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping, Timer, ModelSummary, Callback, RichProgressBar, RichModelSummary, TQDMProgressBar
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping, Timer, Callback
 from lightning.pytorch.loggers import TensorBoardLogger
 from rich.console import Console
 from rich.table import Table
@@ -55,31 +55,6 @@ class OverfittingEarlyStopping(EarlyStopping):
             self.increase_count = 0
             super().on_validation_end(trainer, pl_module)
 
-def experiment_name(exp, loss):
-    ckp = ModelCheckpoint(
-                dirpath=f"./content/aims_proj/saved_models/{exp}-{loss}",
-                filename="model-{epoch:02d}-{val_loss:.2f}",
-                save_top_k=1,
-                verbose=False,
-                monitor="val_loss",
-                mode="min"
-                )
-    logger = TensorBoardLogger(save_dir="./content/aims_proj/lightning_logs/", name=f"{exp}")
-    return [ckp] , logger
-
-timer = Timer()
-
-def read_time():
-    sec = timer.time_elapsed("train")
-    td = datetime.timedelta(seconds=sec)
-    total_seconds = td.total_seconds()
-    hours, remainder = divmod(total_seconds, 3600)
-
-    minutes, remainder = divmod(remainder, 60)
-    seconds, milliseconds = divmod(remainder, 1)
-    # Format time 
-    hmsms = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}.{int(milliseconds * 1000):03}"
-    print(f"Training time: {hmsms}")
 
 def stage_data(dm, num_workers, batch_size):
     if dm == 'TrackML':
@@ -123,9 +98,8 @@ def stage_trainer(model, ckpts, logger, data_module, val_batches, test_batches, 
     trainer.fit(lighting_model, data_module, ckpt_path="last")
     return trainer, lighting_model
 
-bar = RichProgressBar()
 hyper = ParmSummary()
 lr_monitor = LearningRateMonitor(logging_interval="epoch")
 # logger = TensorBoardLogger(save_dir="/content/aims_proj/lightning_logs/", name="toytrack_Transformer")
 early_stopping = OverfittingEarlyStopping(verbose=True)
-callbacks_list = [ timer, hyper, lr_monitor, summary]
+callbacks_list = [ hyper]
