@@ -273,7 +273,7 @@ class TrackMLDataset(IterBase):
 
         grouped = merged_df.groupby('particle_id')
 
-        for particle_id, group in grouped:
+        for _, group in grouped:
             inputs = group[['tx', 'ty', 'tz']].values
             target = group[['pT', 'pz']].values[0]
 
