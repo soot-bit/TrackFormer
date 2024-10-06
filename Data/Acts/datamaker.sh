@@ -69,10 +69,10 @@ for i in "${!EVENT_ARRAY[@]}"; do
     fi
 
     
-    if [ "$dest_dir" != "$prev_dest_dir" ]; then
-        echo "copying to $dest_dir ..."
-        prev_dest_dir="$dest_dir"
-    fi
+    # if [ "$dest_dir" != "$prev_dest_dir" ]; then
+    #     echo "copying to $dest_dir ..."
+    #     prev_dest_dir="$dest_dir"
+    # fi
     
     # copy
     for file_type in parameters particles spacepoint tracks; do
@@ -81,7 +81,7 @@ for i in "${!EVENT_ARRAY[@]}"; do
         
         cp "$src_file" "$dest_file" && ((total_success++))
         #progess
-        printf "[%3d%%] Copied: %s-%s.csv to %s\r" $((total_success * 100 / total_files)) "$event" "$file_type" "$dest_dir"
+        printf "[%3d%%] \t Desitination: %s \t Copied: %s-%s.csv \r" $((total_success * 100 / total_files)) "$dest_dir" "$event"  "$file_type" 
     done
 done
 
