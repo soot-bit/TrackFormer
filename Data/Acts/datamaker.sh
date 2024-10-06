@@ -68,12 +68,6 @@ for i in "${!EVENT_ARRAY[@]}"; do
         dest_dir="test"
     fi
 
-    
-    # if [ "$dest_dir" != "$prev_dest_dir" ]; then
-    #     echo "copying to $dest_dir ..."
-    #     prev_dest_dir="$dest_dir"
-    # fi
-    
     # copy
     for file_type in parameters particles spacepoint tracks; do
         src_file="$DATASET_DIR/$event-$file_type.csv"

@@ -1,5 +1,6 @@
 lightning[pytorch-extra]
 rich 
+wandb
 scipy
 matplotlib
 numba

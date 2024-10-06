@@ -368,10 +368,9 @@ class TrackMLRAM(Dataset):
         return self.data[index]
 
 class TML_RAM_DataModule(L.LightningDataModule):
-    def __init__(self, train_dir, test_dir, batch_size=2_000, num_workers=15, pin_memory=False, persistence = False ):
+    def __init__(self, dataset_dir, batch_size=2_000, num_workers=15, pin_memory=False, persistence = False ):
         super().__init__()
-        self.train_dir = train_dir
-        self.test_dir = test_dir
+        self.data_dir = Path(dataset_dir) if dataset_dir else Path("Data/Tml")
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.pin_memory = pin_memory
@@ -379,9 +378,9 @@ class TML_RAM_DataModule(L.LightningDataModule):
 
 
         if "train" not in global_TrackMLRAM:
-            global_TrackMLRAM["train"] = TrackMLRAM(self.train_dir)
+            global_TrackMLRAM["train"] = TrackMLRAM(next(self.data_dir.glob("*train*")))
         if "test" not in global_TrackMLRAM:
-            global_TrackMLRAM["test"] = TrackMLRAM(self.test_dir)
+            global_TrackMLRAM["test"] = TrackMLRAM(next(self.data_dir.glob("*test*")))
 
         train_data = global_TrackMLRAM["train"]
         self.train_size = int(0.8 * len(train_data))
