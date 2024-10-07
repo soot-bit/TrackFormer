@@ -7,23 +7,16 @@ trainer:
   num_nodes: 1
   precision: 32
   logger:
-    - class_path: lightning.pytorch.loggers.WandbLogger
-      init_args:
-        name: "tml test"
-        save_dir: Data
-        id: null
-        anonymous: null
-        project: TrackFormer-acts
-        log_model: false
-        prefix: ''
     - class_path: lightning.pytorch.loggers.TensorBoardLogger
       init_args: 
         save_dir: Data/Tb
+        default_hp_metric: false
+        name: acts-final  ## same name
   callbacks:
     - class_path: lightning.pytorch.callbacks.Timer
       init_args:
         duration: "00:01:00:00" 
-        interval: "step" # duration
+        interval: "step" 
         verbose: true
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
@@ -39,55 +32,32 @@ trainer:
         save_weights_only: false
         mode: min
   fast_dev_run: false
-  max_epochs: 10
-  min_epochs: null
-  max_steps: -1
-  min_steps: null
-  max_time: null
-  limit_train_batches: null
-  limit_val_batches: null
-  limit_test_batches: null
-  limit_predict_batches: null
+  max_epochs: 12
   overfit_batches: 0.0
-  val_check_interval: null
   check_val_every_n_epoch: 1
-  num_sanity_val_steps: null
   log_every_n_steps: 1
-  enable_checkpointing: null
-  enable_progress_bar: null
-  enable_model_summary: true
-  accumulate_grad_batches: 1
-  gradient_clip_val: null
-  gradient_clip_algorithm: null
-  deterministic: null
-  benchmark: null
-  inference_mode: true
-  use_distributed_sampler: true
-  profiler: null
-  detect_anomaly: false
-  barebones: false
-  plugins: null
-  sync_batchnorm: false
-  reload_dataloaders_every_n_epochs: 0
-  default_root_dir: null
+
+# model
 model:
   class_path: src.my_model.transformer.TrackFormer
   init_args:
     input_dim: 3
-    model_dim: 128
+    model_dim: 200
     num_classes: 1
     num_heads: 4
-    num_layers: 3
+    num_layers: 2
     criterion: qloss-0.5
-    max_iters: 640
+    max_iters: 160 ## always check try to make automatic
     warmup: 100
-    lr: 0.003
-    dropout: 0.0
-    input_dropout: 0.0
+    lr: 0.0002
+    dropout: 0.1
+    input_dropout: 0.1
+    
+    ## Dataset
 data:
   class_path: src.datasets.datamodules.ActsDataModule
   init_args:
-    batch_size: 128
+    batch_size: 2048
     num_workers: 16
     persistence: false
 ckpt_path: last

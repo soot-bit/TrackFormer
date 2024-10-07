@@ -96,15 +96,15 @@ model:
   init_args:
     input_dim: 3
     model_dim: 128
-    num_classes: 1
+    num_classes: 2
     num_heads: 4
     num_layers: 4
     criterion: mse
     max_iters: 2
     warmup: 100
     lr: 0.003
-    dropout: 0.0
-    input_dropout: 0.0
+    dropout: 0.1
+    input_dropout: 0.1
 data:
   class_path: src.datasets.datamodules.ActsDataModule
   init_args:
