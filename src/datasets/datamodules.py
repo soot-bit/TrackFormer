@@ -3,6 +3,7 @@ from torch.utils.data import  random_split, DataLoader, Dataset, IterableDataset
 import torch
 import math
 import os
+from tqdm.auto import tqdm 
 from rich.console import Console
 console = Console()
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
@@ -211,51 +212,71 @@ class ToyTrackDataModule(L.LightningDataModule):
 
 
 class IterBase(IterableDataset):
-    """ Iterable Base class for TrackML and ACTS datasets.
+    """Iterable Base class for TrackML and ACTS datasets.
 
     Attributes:
         folder (Path): directory containing dataset.
     """
 
-    def __init__(self, directory, folder = "csv"):
+    def __init__(self, directory, folder="csv", load_in_memory=False):
         self.path = Path(directory) if directory else Path.cwd() / "Data/Acts" / folder
         self.start, self.end = self._event_range()
+        self.load_in_memory = load_in_memory
+        self.data_in_memory = []  # To store data if loaded into memory
+
+        if self.load_in_memory:
+            self._load_all_data_into_memory()  # Load data into memory during initialization
 
     def _event_range(self):
         files = sorted(self.path.glob('*'))
 
-        event_numbers = [ int(file.stem.split('-')[0][5:]) for file in files if file.is_file() ]
+        event_numbers = [int(file.stem.split('-')[0][5:]) for file in files if file.is_file()]
 
         if not event_numbers:
             raise FileNotFoundError("Uh-oh! Looks like the files are on vacation...")
 
-        return min(event_numbers), max(event_numbers) 
+        return min(event_numbers), max(event_numbers)
 
     def _preprocessor(self, event: str):
         raise NotImplementedError("Implement preprocessing logic...")
+
     def _load_event(self, eventfiles: str):
-        raise NotImplementedError("Implement loading logic.....")
-        
+        raise NotImplementedError("Implement loading logic...")
+
+    def _load_all_data_into_memory(self):
+        """Load all events into memory."""
+        for i in range(self.start, self.end + 1):
+            event = f'event{i:09d}'
+            event_files = self._load_event(event) 
+            processed_data = self._preprocessor(event_files)
+            if processed_data is not None:
+                self.data_in_memory.append(processed_data)
 
     def __iter__(self):
-        worker_info = get_worker_info()
-        if worker_info is None:  # Single-process 
-            iter_start = self.start
-            iter_end = self.end
+        if self.load_in_memory:
+            # Yield preloaded data
+            for data in self.data_in_memory:
+                yield data
         else:
-            # Split workload among workers
-            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
-            worker_id = worker_info.id
-            iter_start = self.start + worker_id * per_worker
-            iter_end = min(iter_start + per_worker, self.end)
+            # Lazy loading (streaming mode)
+            worker_info = get_worker_info()
+            if worker_info is None:  # Single-process
+                iter_start = self.start
+                iter_end = self.end
+            else:
+                # Split workload among workers
+                per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
+                worker_id = worker_info.id
+                iter_start = self.start + worker_id * per_worker
+                iter_end = min(iter_start + per_worker, self.end)
 
-        for i in range(iter_start, iter_end):
-            event = f'event{i:09d}'
-            event_files = self._load_event(event)
-            processed_data = self._preprocessor(event_files) 
-            if processed_data is None:
-                continue
-            yield processed_data
+            for i in range(iter_start, iter_end):
+                event = f'event{i:09d}'
+                event_files = self._load_event(event)
+                processed_data = self._preprocessor(event_files)
+                if processed_data is None:
+                    continue
+                yield processed_data
 
 ########################################### TML dataset:
 
@@ -488,17 +509,21 @@ class ActsDataset(IterBase):
         """Preprocesses data for the specified event.
 
         Args:
-            event_prefix (str): The event to preprocess.
+            event_files (tuple): Tuple containing the loaded event data files.
         """
-        #files
-        spacepoints, tracks, _, _ = event_files
-        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values, dtype=torch.float32)
-        pt = tracks["pT"].values
-        if pt.size == 0: 
-            return None
-        pt = torch.tensor(pt, dtype=torch.float32)
 
-        return xyz, torch.ones(xyz.shape[0], dtype=bool), pt 
+        spacepoints, _, particles, _ = event_files
+        
+        # Convert to a tensor
+        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values, dtype=torch.float32)
+        pt = torch.sqrt(torch.tensor(particles.px.values, dtype=torch.float32)**2 + 
+                    torch.tensor(particles.py.values, dtype=torch.float32)**2)
+        
+        if pt.size(0) == 0:
+            return None
+        
+        return xyz, torch.ones(xyz.shape[0], dtype=torch.bool), pt
+
 
 
 class ActsDataModule(L.LightningDataModule):
