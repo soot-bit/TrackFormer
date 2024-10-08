@@ -8,7 +8,7 @@ from rich.console import Console
 console = Console()
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
 import numpy as np
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from pathlib import Path
@@ -155,6 +155,7 @@ class ToyTrackDataModule(L.LightningDataModule):
             self.train_batches = train_len//self.batch_size
 
         else:
+            console.rule(f"Streaming ToyTrack")
             self.dataset = ToyTrackDataset()
             self.train_batches = None
             
@@ -419,60 +420,6 @@ class TML_RAM_DataModule(L.LightningDataModule):
             targets = torch.stack(targets, dim=0)
             return inputs, mask, targets
 
-
-################################################### Helper function:
-
-def extract_data(data_path):
-    """
-    Extracts features and target and saves the data to Torch tensor.
-
-    Args:
-       Path to the dataset.
-    """
-
-    files = os.listdir(data_path)
-    files.sort()
-
-    start, end = int(files[0].split('-')[0][5:]), int(files[1_000].split('-')[0][5:]) + 1
-
-    data = []
-
-    total_events = end - start
-
-    for i in tqdm(range(start, end)):
-        event = f'event00000{i:02d}'
-        path = os.path.join(data_path, event)
-
-        hits, cells, particles, truth = load_event(path)
-        particles = particles[particles['nhits'] >= 5]
-        merged_df = pd.merge(truth, particles, on='particle_id')
-        merged_df = pd.merge(merged_df, hits, on='hit_id')
-
-        merged_df['pT'] = np.sqrt(merged_df['px']**2 + merged_df['py']**2)
-
-        grouped = merged_df.groupby('particle_id')
-
-        for particle_id, group in grouped:
-            inputs = group[['tx', 'ty', 'tz']].values
-            target = group[['pT', 'pz']].values[0]
-
-            zxy = torch.tensor(inputs, dtype=torch.float32)
-            target_tensor = torch.tensor(target, dtype=torch.float32)
-
-            data.append((zxy, target_tensor))
-
-    
-   
-
-    #  training and test sets split
-    random.shuffle(data)
-    train_size = int(0.8 * len(data))
-    train_data = data[:train_size]
-    test_data = data[train_size:]
-
-    # Save 
-    torch.save(train_data, "/content/TML_datafiles/tml_hits_preprocessed_train.pt")
-    torch.save(test_data, "/content/TML_datafiles/tml_hits_preprocessed_test.pt")
 
 
 
