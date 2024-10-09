@@ -7,7 +7,7 @@
 
 ## Overview
 
-TrackFormer is a unique solution to particle trajectory reconstruction that employs transformer-inspired design. Using Transformers' powerful self-attention mechanism, this model successfully performs track fitting, resulting in better accuracy and efficiency.
+TrackFormer is a unique solution to particle trajectory reconstruction that uses transformer-inspired design. Using Transformers' powerful self-attention mechanism, this model successfully performs track fitting, resulting in better accuracy and efficiency.
 
 ## Features
 
@@ -20,5 +20,5 @@ TrackFormer is a unique solution to particle trajectory reconstruction that empl
 
 1. **Clone the repository**:
 2. download datasets to specific directory in Data
-3. train, test split dataset  with `datmaker.sh /path/to/dataset 80 10 10`
+3. train, test split dataset  with `Data/Acts/datamaker.sh /path/to/dataset 80 10 10`
 4. example usage `python main.py fit --config configs/tformer.yaml  --data ActsDataModule  --config configs/trainer.yaml`
