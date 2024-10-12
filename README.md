@@ -11,7 +11,7 @@ TrackFormer is a unique solution to particle trajectory reconstruction that uses
 
 ## Features
 
-- **Transformer-based Architecture**: For fast efficient and accurate particle track reconstruction.
+- **Transformer-based Architecture**: For fast efficient and accurate particle track fitting.
 - **Built with Lightning Integration**:
 - **Modular Design**: 
 - **Logging and CLI integration**:
