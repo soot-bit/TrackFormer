@@ -11,8 +11,7 @@ import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from pathlib import Path
-import random
-from trackml.dataset import load_dataset, load_event
+from trackml.dataset import load_event
 import pandas as pd
 
 
@@ -20,194 +19,112 @@ import pandas as pd
 #############################################################: TOY TRACK
 
             #################################
-            #   Track Datasets with padding #
+            #  TOY TRACK                    #
             #################################
 
 class ToyTrackDataset(IterableDataset):
     """
-        Generates trackdata on the fly using ToyTrack module
-    see https://github.com/ryanliu30
+    Generates track data on the fly using ToyTrack module.
+    See https://github.com/ryanliu30
     """
-    def __init__(
-            self,
-            hole_inefficiency: Optional[float] = 0,
-            d0: Optional[float] = 0.1,
-            noise: Optional[Union[float, List[float], List[Union[float, str]]]] = 0,
-            lambda_: Optional[float] = 50,
-            pt_dist: Optional[Union[float, List[float], List[Union[float, str]]]] = [1, 5],
-            warmup_t0: Optional[float] = 0,
-        ):
+    def __init__(self, hole_inefficiency=0, d0=0.1, noise=0, lambda_=50, pt_dist=[1, 5], num_events=1000):
         super().__init__()
-
         self.hole_inefficiency = hole_inefficiency
         self.d0 = d0
         self.noise = noise
-        self.lambda_ = lambda_
         self.pt_dist = pt_dist
+        self.num_events = num_events  
+        self.current_sample = 0 
+        self.detector = self._create_detector()
+        self.particle_gun = self._create_particle_gun()
 
-    def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
-        return _TrackIterable(
-            self.hole_inefficiency,
-            self.d0,
-            self.noise,
-            self.lambda_,
-            self.pt_dist,
-        )
-
-class _TrackIterable:
-    def __init__(
-            self,
-            hole_inefficiency: Optional[float] = 0,
-            d0: Optional[float] = 0.1,
-            noise: Optional[Union[float, List[float], List[Union[float, str]]]] = 0,
-            lambda_: Optional[float] = 50,
-            pt_dist: Optional[Union[float, List[float], List[Union[float, str]]]] = [1, 10],
-            warmup_t0: Optional[float] = 0
-        ):
-
-        self.detector = Detector(
+    def _create_detector(self):
+        return Detector(
             dimension=2,
-            hole_inefficiency=hole_inefficiency
-        ).add_from_template(
-            'barrel',
-            min_radius=0.5,
-            max_radius=3,
-            number_of_layers=10,
-        )
+            hole_inefficiency=self.hole_inefficiency
+        ).add_from_template('barrel', min_radius=0.5, max_radius=3, number_of_layers=10)
 
-        self.particle_gun = ParticleGun(
+    def _create_particle_gun(self):
+        return ParticleGun(
             dimension=2,
             num_particles=1,
-            pt=pt_dist,
+            pt=self.pt_dist,
             pphi=[-np.pi, np.pi],
-            vx=[0, d0 * 0.5**0.5, 'normal'],
-            vy=[0, d0 * 0.5**0.5, 'normal'],
+            vx=[0, self.d0 * 0.5**0.5, 'normal'],
+            vy=[0, self.d0 * 0.5**0.5, 'normal'],
         )
 
-        self.event_gen = EventGenerator(self.particle_gun, self.detector, noise)
+    def __iter__(self):
+        self.event_gen = EventGenerator(self.particle_gun, self.detector, self.noise)
+        self.current_sample = 0
+        return self
 
     def __next__(self):
+        if self.current_sample >= self.num_events:
+            raise StopIteration  
+
+        # an event
         event = self.event_gen.generate_event()
-
-        pt = event.particles.pt
-
         x = torch.tensor([event.hits.x, event.hits.y], dtype=torch.float).T.contiguous()
-        mask = torch.ones(x.shape[0], dtype=bool)
-
-        return x, mask, torch.tensor([pt], dtype=torch.float)
-
-class ToyTrackWrapper(Dataset):
-    
-    """ Generates and stores track data  
-        ---------------------------------
-    """ 
-    def __init__(self, num_events: int = 200):
-        self.tracks_dataset = ToyTrackDataset()
-        self.num_events = num_events
-        self.events = []
-
-        self._generate_events()
-
-    def _generate_events(self):
-        iterable = iter(self.tracks_dataset)
-        for _ in range(self.num_events):
-            self.events.append(next(iterable))
+        self.current_sample += 1 
+        return x, torch.ones(x.shape[0], dtype=bool), torch.tensor([event.particles.pt], dtype=torch.float)
 
     def __len__(self):
-        return self.num_events
+        return self.num_events  
 
-    def __getitem__(self, idx):
-        return self.events[idx]
 
-           
-           
+
+
            
             ###################################
             # ToyTrack Lightning Data Module  #
             ###################################
+
+
 class ToyTrackDataModule(L.LightningDataModule):
     def __init__(
         self,
-        use_wrapper: bool = False,
         batch_size: int = 20,
-        wrapper_size:int = 200,
         num_workers: int = 10,
         persistence: bool = False,
-    
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.persistence = persistence if num_workers == 0 else True
-        
 
-        if use_wrapper:
-            self.dataset = ToyTrackWrapper(wrapper_size)
-            console.rule(f"ToyTrack {len(self.dataset)} events")
-            train_len = int(len(self.dataset) * 0.6)
-            val_len = int(len(self.dataset) * 0.2)
-            test_len = len(self.dataset) - self.train_len - val_len
-            self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-                self.dataset, [self.train_len, val_len, test_len]
-            )
-            self.train_batches = train_len//self.batch_size
-
-        else:
-            console.rule(f"Streaming ToyTrack")
-            self.dataset = ToyTrackDataset()
-            self.train_batches = None
-            
-
-
-        if isinstance(self.dataset, ToyTrackWrapper):
-            self.train_len = int(len(self.dataset) * 0.6)
-            val_len = int(len(self.dataset) * 0.2)
-            test_len = len(self.dataset) - self.train_len - val_len
-            self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-                self.dataset, [self.train_len, val_len, test_len]
-            )
-        elif isinstance(self.dataset, ToyTrackDataset):
-            console.rule("ToyTrack")
-            self.train_dataset = self.dataset
-            self.val_dataset = self.dataset
-            self.test_dataset = self.dataset
-        else:
-            console.rule("Unknown dataset type:", type(self.dataset))
+       
+        self.dataset = ToyTrackDataset()
+        console.rule("Streaming ToyTrack")
 
     def train_dataloader(self):
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-            persistent_workers=self.persistence
-        )
+        return self._create_dataloader(self.dataset)
 
     def val_dataloader(self):
+        return self._create_dataloader(self.dataset)
+
+    def test_dataloader(self):
+        return self._create_dataloader(self.dataset)
+
+    def _create_dataloader(self, dataset):
+        """Helper method to create a DataLoader."""
         return DataLoader(
-            self.val_dataset,
+            dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
             persistent_workers=self.persistence
         )
 
-    def test_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            collate_fn=self.collate_fn,
-            num_workers=self.num_workers,
-            persistent_workers=self.persistence  
-        )
     @staticmethod
     def collate_fn(ls):
         """Batch maker"""
         x, mask, pt = zip(*ls)
         return pad_sequence(x, batch_first=True), pad_sequence(mask, batch_first=True), torch.cat(pt).squeeze()
-    
-    
+
+
+
+
 ############################################ BASE CLASSES:
 
 
