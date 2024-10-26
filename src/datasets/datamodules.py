@@ -8,7 +8,6 @@ from rich.console import Console
 console = Console()
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
 import numpy as np
-from tqdm.auto import tqdm
 from torch.nn.utils.rnn import pad_sequence
 import lightning as L
 from pathlib import Path
