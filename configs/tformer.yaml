@@ -11,7 +11,7 @@ trainer:
       init_args: 
         save_dir: Data/Tb
         default_hp_metric: false
-        name: acts-final  ## same name
+        name: test-mse  ## same name
   callbacks:
     - class_path: lightning.pytorch.callbacks.Timer
       init_args:
@@ -46,7 +46,7 @@ model:
     num_classes: 1
     num_heads: 4
     num_layers: 2
-    criterion: qloss-0.5
+    criterion: mse
     max_iters: 160 ## always check try to make automatic
     warmup: 100
     lr: 0.0002

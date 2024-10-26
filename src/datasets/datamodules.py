@@ -426,7 +426,7 @@ class TML_RAM_DataModule(L.LightningDataModule):
 ########################## ACTS data:
 class ActsDataset(IterBase):
     
-    def __init__(self, folder="csv", directory=None):
+    def __init__(self, folder="test", directory=None):
         self.event = 0
         super().__init__(directory, folder)
         
