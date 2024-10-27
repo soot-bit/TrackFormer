@@ -3,8 +3,7 @@ from torch.utils.data import  random_split, DataLoader, Dataset, IterableDataset
 import torch
 import math
 import os
-from tqdm.auto import tqdm 
-from rich.console import Console
+from rich.console import Console  
 console = Console()
 from src.datasets.utils import ParticleGun, Detector, EventGenerator
 import numpy as np
@@ -27,14 +26,12 @@ class ToyTrackDataset(IterableDataset):
     Generates track data on the fly using ToyTrack module.
     See https://github.com/ryanliu30
     """
-    def __init__(self, hole_inefficiency=0, d0=0.1, noise=0, lambda_=50, pt_dist=[1, 5], num_events=1000):
+    def __init__(self, hole_inefficiency=0, d0=0.1, noise=0, lambda_=50, pt_dist=[1, 5]):
         super().__init__()
         self.hole_inefficiency = hole_inefficiency
         self.d0 = d0
         self.noise = noise
         self.pt_dist = pt_dist
-        self.num_events = num_events  
-        self.current_sample = 0 
         self.detector = self._create_detector()
         self.particle_gun = self._create_particle_gun()
 
@@ -56,22 +53,13 @@ class ToyTrackDataset(IterableDataset):
 
     def __iter__(self):
         self.event_gen = EventGenerator(self.particle_gun, self.detector, self.noise)
-        self.current_sample = 0
         return self
 
     def __next__(self):
-        if self.current_sample >= self.num_events:
-            raise StopIteration  
-
         # an event
         event = self.event_gen.generate_event()
         x = torch.tensor([event.hits.x, event.hits.y], dtype=torch.float).T.contiguous()
-        self.current_sample += 1 
         return x, torch.ones(x.shape[0], dtype=bool), torch.tensor([event.particles.pt], dtype=torch.float)
-
-    def __len__(self):
-        return self.num_events  
-
 
 
 
@@ -87,12 +75,13 @@ class ToyTrackDataModule(L.LightningDataModule):
         batch_size: int = 20,
         num_workers: int = 10,
         persistence: bool = False,
+        pin_memory: bool = True
     ):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.persistence = persistence if num_workers == 0 else True
-
+        self.pin_memory = pin_memory
        
         self.dataset = ToyTrackDataset()
         console.rule("Streaming ToyTrack")
@@ -114,6 +103,7 @@ class ToyTrackDataModule(L.LightningDataModule):
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
             persistent_workers=self.persistence
+            pin_memory=self.pin_memory
         )
 
     @staticmethod
