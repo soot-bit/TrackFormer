@@ -7,4 +7,5 @@ numba
 plotly
 pandas
 tensorboard
+humanize
 git+https://github.com/LAL/trackml-library.git@v2

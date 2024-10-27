@@ -18,8 +18,9 @@ import pandas as pd
 #############################################################: TOY TRACK
 
             #################################
-            #  TOY TRACK                    #
+            #           TOY TRACK           #
             #################################
+
 
 class ToyTrackDataset(IterableDataset):
     """
@@ -69,7 +70,7 @@ class ToyTrackDataset(IterableDataset):
             ###################################
 
 
-class ToyTrackDataModule(L.LightningDataModule):
+class ToytrackDataModule(L.LightningDataModule):
     def __init__(
         self,
         batch_size: int = 20,
@@ -78,11 +79,7 @@ class ToyTrackDataModule(L.LightningDataModule):
         pin_memory: bool = True
     ):
         super().__init__()
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.persistence = persistence if num_workers == 0 else True
-        self.pin_memory = pin_memory
-       
+        self.save_hyperparameters(ignore=['_class_path'])
         self.dataset = ToyTrackDataset()
         console.rule("Streaming ToyTrack")
 
@@ -99,11 +96,11 @@ class ToyTrackDataModule(L.LightningDataModule):
         """Helper method to create a DataLoader."""
         return DataLoader(
             dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
             collate_fn=self.collate_fn,
-            persistent_workers=self.persistence
-            pin_memory=self.pin_memory
+            persistent_workers=self.hparams.num_workers > 0 and self.hparams.persistence, 
+            pin_memory=self.hparams.pin_memory
         )
 
     @staticmethod
@@ -115,7 +112,12 @@ class ToyTrackDataModule(L.LightningDataModule):
 
 
 
-############################################ BASE CLASSES:
+
+
+
+
+
+############################################ Realist stuff:
 
 
 class IterBase(IterableDataset):
