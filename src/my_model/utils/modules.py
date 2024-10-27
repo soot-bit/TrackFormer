@@ -160,9 +160,12 @@ class TransformerEncoder(nn.Module):
 
 class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
 
-    def __init__(self, optimizer, warmup, max_iters):
+    def __init__(self, optimizer, warmup, trainer):
         self.warmup = warmup
-        self.max_num_iters = max_iters
+        if hasattr(trainer.train_dataloader, '__len__'):
+            self.max_num_iters = trainer.max_epochs * len(trainer.train_dataloader)
+        else:
+            self.max_num_iters = trainer.max_epochs * trainer.limit_train_batches
         super().__init__(optimizer)
 
     def get_lr(self):
@@ -215,7 +218,7 @@ class BaseModel(L.LightningModule):
         quantile (float, optional): Quantile value for quantile loss, if used. Default is 0.5.
     '''
 
-    def __init__(self, criterion, lr, max_iters, warmup):
+    def __init__(self, criterion, lr, warmup):
         super().__init__()
         self.criterion = Loss(criterion)
         self.save_hyperparameters()
@@ -224,7 +227,7 @@ class BaseModel(L.LightningModule):
         optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr)
         lr_scheduler = CosineWarmupScheduler(optimizer,
                                              warmup=self.hparams.warmup,
-                                             max_iters=self.hparams.max_iters)
+                                             trainer=self.trainer)
         return [optimizer], [{'scheduler': lr_scheduler, 'interval': 'step'}]
 
     

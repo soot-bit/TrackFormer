@@ -24,9 +24,9 @@ class TrackFormer(BaseModel):
             num_layers : Number of Transformer encoder blocks to use.
     """
 
-    def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, criterion, max_iters,
+    def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, criterion,
                      warmup, lr, dropout=0.0, input_dropout=0.0):
-        super().__init__(criterion, max_iters, warmup, lr)
+        super().__init__(criterion, warmup, lr)
         self.save_hyperparameters(ignore=['_class_path'])
         self._create_model()
 

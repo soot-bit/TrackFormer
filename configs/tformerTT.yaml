@@ -3,7 +3,7 @@ seed_everything: 0
 trainer:
   num_nodes: 1
   precision: 32
-  default_root_dir: Data/Tb/tt #mod for experiment
+  default_root_dir: Data #mod for experiment
   max_epochs: 3
   limit_train_batches: 100
   limit_val_batches: 20
@@ -34,7 +34,7 @@ trainer:
         mode: min
 
 
-
+  
 ########################################## model
 model:
   class_path: src.my_model.transformer.TrackFormer
@@ -45,7 +45,6 @@ model:
     num_heads: 4
     num_layers: 2
     criterion: mse
-    max_iters: 160 ## always check try to make automatic
     warmup: 100
     lr: 0.0002
     dropout: 0.1

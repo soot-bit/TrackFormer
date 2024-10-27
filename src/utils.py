@@ -1,7 +1,8 @@
-from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping, Timer, Callback
-from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.callbacks import Timer, Callback
 from rich.console import Console
 from rich.table import Table
+import time
+import humanize
 console = Console()
 
 
@@ -30,6 +31,18 @@ class ParmSummary(Callback):
         console.rule("[bold magenta]🤖TransFormer[/bold magenta]")
         console.print(table)
         console.rule("[bold magenta]Parameters[/bold magenta]")
+
+
+
+class TimeLogger(Timer):
+    def on_train_end(self, trainer, pl_module):
+        start = self.start_time("train")
+        end = self.end_time("train")
+        if start and end:
+            total_train_time = end - start
+            human_readable_time = humanize.precisedelta(total_train_time)
+            print(f"Training completed in: {human_readable_time}")
+
 
 
 # class OverfittingEarlyStopping(EarlyStopping):
