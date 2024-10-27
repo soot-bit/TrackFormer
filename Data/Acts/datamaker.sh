@@ -79,7 +79,6 @@ for i in "${!EVENT_ARRAY[@]}"; do
     done
 done
 
-# Final summary with clearer formatting
 echo ""
 echo ""
 
