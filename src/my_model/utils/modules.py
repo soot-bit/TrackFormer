@@ -160,12 +160,13 @@ class TransformerEncoder(nn.Module):
 
 class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
 
-    def __init__(self, optimizer, warmup, trainer):
+    def __init__(self, optimizer, warmup, max_iters):
         self.warmup = warmup
-        if hasattr(trainer.train_dataloader, '__len__'):
-            self.max_num_iters = trainer.max_epochs * len(trainer.train_dataloader)
-        else:
-            self.max_num_iters = trainer.max_epochs * trainer.limit_train_batches
+        self.max_iters = max_iters
+        # if hasattr(trainer.train_dataloader, '__len__'):
+        #     self.max_num_iters = trainer.max_epochs * len(trainer.train_dataloader)
+        # else:
+        #     self.max_num_iters = trainer.max_epochs * trainer.limit_train_batches
         super().__init__(optimizer)
 
     def get_lr(self):
@@ -173,7 +174,7 @@ class CosineWarmupScheduler(optim.lr_scheduler._LRScheduler):
         return [base_lr * lr_factor for base_lr in self.base_lrs]
 
     def get_lr_factor(self, epoch):
-        lr_factor = 0.5 * (1 + np.cos(np.pi * epoch / self.max_num_iters))
+        lr_factor = 0.5 * (1 + np.cos(np.pi * epoch / self.max_iters))
         if epoch <= self.warmup:
             lr_factor *= epoch * 1.0 / self.warmup
         return lr_factor
@@ -222,12 +223,17 @@ class BaseModel(L.LightningModule):
         super().__init__()
         self.criterion = Loss(criterion)
         self.save_hyperparameters()
-        
+
+    def setup(self, stage=None):
+        if stage == 'fit' and self.trainer.datamodule:
+            self.total_steps = sum(1 for _ in self.trainer.datamodule.train_dataloader())
+            print(f"Total steps in dataset: {self.total_steps}")
+
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr)
         lr_scheduler = CosineWarmupScheduler(optimizer,
                                              warmup=self.hparams.warmup,
-                                             trainer=self.trainer)
+                                             max_iters=self.total_steps * self.trainer.max_epochs)
         return [optimizer], [{'scheduler': lr_scheduler, 'interval': 'step'}]
 
     

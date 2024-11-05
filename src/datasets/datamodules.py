@@ -156,7 +156,6 @@ class IterBase(IterableDataset, ABC):
         """Implement loading logic."""
         raise NotImplementedError
 
-
     def __iter__(self):
         worker_info = get_worker_info()
         total_events = len(self.available_events)
@@ -391,7 +390,8 @@ class ActsDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self.ACTScollate_fn,
-            persistent_workers=self.persistence
+            persistent_workers=self.persistence,
+            pin_memory=True
         )
 
     def val_dataloader(self):
@@ -400,7 +400,8 @@ class ActsDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             collate_fn=self.ACTScollate_fn,
-            persistent_workers=self.persistence
+            persistent_workers=self.persistence,
+            pin_memory=True
         )
 
     def test_dataloader(self):

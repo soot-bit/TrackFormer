@@ -2,7 +2,6 @@ import lightning as L
 from torch import nn, optim
 from src.my_model.utils.modules import TransformerEncoder, BaseModel
 import torch
-from lightning.pytorch.callbacks import  Callback
 
 
 
@@ -76,7 +75,3 @@ class TrackFormer(BaseModel):
         x = self.input_net(x)
         attention_maps = self.transformer.get_attention_maps(x)
         return attention_maps
-
-
-    
-
