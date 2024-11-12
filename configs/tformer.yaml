@@ -45,12 +45,12 @@ model:
     num_classes: 1
     num_heads: 4
     num_layers: 2
-    criterion: qloss-0.2
     warmup: 100
     lr: 0.0002
     dropout: 0.4
-
     input_dropout: 0.4
+    use_scheduler: True
+    criterion: qloss-0.2
     
     ## Dataset
 data:

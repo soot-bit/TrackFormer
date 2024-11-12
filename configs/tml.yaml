@@ -34,7 +34,7 @@ trainer:
         mode: min
 
 
-  
+
 ########################################## model
 model:
   class_path: src.my_model.transformer.TrackFormer

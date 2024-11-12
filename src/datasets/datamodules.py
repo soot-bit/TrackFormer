@@ -119,9 +119,9 @@ class ToytrackDataModule(L.LightningDataModule):
 
 ##################################################################
 
-                    ###############################                                
-                    #       TrackML               #   
-                    ###############################
+                    ######################################                                
+                    #       BASE Realistic Datasets       #      
+                    #######################################
 
 
 class IterBase(IterableDataset, ABC):
@@ -175,6 +175,46 @@ class IterBase(IterableDataset, ABC):
             if processed_data is None:
                 continue
             yield processed_data
+
+class BaseDataModule(L.LightningDataModule):
+    """
+    A Base class for managing dataset loading and collating functionality.
+
+    """
+
+    def __init__(self):
+        super().__init__()
+       
+    def _create_dataloader(self, dataset):
+        """Helper function to initialize data loaders."""
+        return DataLoader(
+            dataset, 
+            batch_size=self.hparams.batch_size, 
+            num_workers=self.hparams.num_workers,
+            collate_fn=self.collate_fn,
+            persistent_workers=bool(self.hparams.num_workers) and self.hparams.persistance,
+            pin_memory=self.hparams.pin_memory
+        )
+    
+    def _create_dataset(self, split):
+        """Helper to initialize datasets"""
+        return self.dataset_class(self.hparams.dataset_dir, folder=split)
+    
+    def train_dataloader(self): return self._create_dataloader(self.train_dataset)
+    def val_dataloader(self): return self._create_dataloader(self.val_dataset)
+    def test_dataloader(self): return self._create_dataloader(self.test_dataset)
+
+    @staticmethod
+    def collate_fn(batch):
+        """Generic collate function for padding sequences."""
+        inputs, masks, targets = zip(*batch)
+        inputs = pad_sequence(inputs, batch_first=True)
+        masks = pad_sequence(masks, batch_first=True, padding_value=0)
+        return inputs, masks, torch.stack(targets, dim=0)
+
+
+
+
 
 
 
@@ -262,7 +302,7 @@ class TrackMLDatasetWrapper(Dataset):
 
 
 
-class TrackMLDataModule(L.LightningDataModule):
+class TrackMLDataModule(BaseDataModule):
 
     """
     Lightning DataModule for managing TrackML datasets
@@ -275,48 +315,20 @@ class TrackMLDataModule(L.LightningDataModule):
     """
 
     def __init__(self, dataset_dir=Path("Data/Tml"), batch_size=32, 
-                 num_workers=os.cpu_count() - 2, use_wrapper=True):
-        super().__init__()
+                 num_workers=os.cpu_count() - 2, use_wrapper=True, 
+                 persistance=False, pin_memory=False):
         self.save_hyperparameters(ignore=['_class_path'])
         self.dataset_class = TrackMLDatasetWrapper if use_wrapper else TrackMLDataset
+        super().__init__()
 
     def setup(self, stage=None):
+        console.rule("TrackML Dataset")
         if stage in ('fit', None):
             self.train_dataset = self._create_dataset("train")
             self.val_dataset = self._create_dataset("val")
 
         if stage in ('test', None):
             self.test_dataset = self._create_dataset("test")
-
-    def _create_dataset(self, split):
-        """Helper to initialize datasets"""
-        return self.dataset_class(self.hparams.dataset_dir, folder=split)
-
-
-    def _create_dataloader(self, dataset):
-        """Helper to initialize data loaders"""
-        return DataLoader(
-            dataset, 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers,
-            collate_fn=self.TMLcollate_fn
-        )
-
-    def train_dataloader(self):
-        return self._create_dataloader(self.train_dataset)
-
-    def val_dataloader(self):
-        return self._create_dataloader(self.val_dataset)
-
-    def test_dataloader(self):
-        return self._create_dataloader(self.test_dataset)
-
-    @staticmethod
-    def TMLcollate_fn(batch):
-        inputs, masks, targets = zip(*batch)
-        inputs = pad_sequence(inputs, batch_first=True)
-        masks = pad_sequence(masks, batch_first=True, padding_value=0)
-        return inputs, masks, torch.stack(targets, dim=0)
 
 
 
@@ -325,9 +337,10 @@ class TrackMLDataModule(L.LightningDataModule):
 ########################## ACTS data:
 class ActsDataset(IterBase):
     
-    def __init__(self, folder="test", directory=None):
+    def __init__(self, directory, folder):
         self.event = 0
-        super().__init__(directory, folder)
+        ds_split = Path(directory) / folder
+        super().__init__(ds_split)
         
 
     def _load_event(self, event_prefix):
@@ -363,63 +376,25 @@ class ActsDataset(IterBase):
 
 
 
-class ActsDataModule(L.LightningDataModule):
+class ActsDataModule(BaseDataModule):
     def __init__(
         self,
+        dataset_dir = Path("Data/Acts"),
+        num_workers = os.cpu_count() - 2,
         batch_size: int = 20,
-        num_workers: int = 0,
-        persistence: bool = False
-
+        persistence: bool = False,
+        pin_memory = True,
+        use_wrapper=False, 
+        persistance=True
     ):
+        
+        self.save_hyperparameters(ignore=['_class_path'])
         super().__init__()
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.persistence = False if num_workers == 0 else persistence
-
 
 
     def setup(self, stage=None):
         console.rule("ACTS Streamlined Preprocessing")
-        self.train_dataset = ActsDataset(folder = "train")
-        self.val_dataset = ActsDataset(folder = "val")
-        self.test_dataset = ActsDataset(folder = "test")
+        self.train_dataset = ActsDataset(self.hparams.dataset_dir, folder = "train", )
+        self.val_dataset = ActsDataset(self.hparams.dataset_dir, folder = "val")
+        self.test_dataset = ActsDataset(self.hparams.dataset_dir, folder = "test")
     
-    def train_dataloader(self):
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            collate_fn=self.ACTScollate_fn,
-            persistent_workers=self.persistence,
-            pin_memory=True
-        )
-
-    def val_dataloader(self):
-        return DataLoader(
-            self.val_dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            collate_fn=self.ACTScollate_fn,
-            persistent_workers=self.persistence,
-            pin_memory=True
-        )
-
-    def test_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            collate_fn=self.ACTScollate_fn,
-            num_workers=self.num_workers,
-            persistent_workers=self.persistence
-        )
-
-
-
-    @staticmethod
-    def ACTScollate_fn(batch):
-        inputs, masks, targets = zip(*batch)
-
-        inputs = pad_sequence(inputs, batch_first=True)
-        masks = pad_sequence(masks, batch_first=True, padding_value=0)
-
-        return inputs, masks, torch.stack(targets, dim=0)

@@ -219,10 +219,9 @@ class BaseModel(L.LightningModule):
         quantile (float, optional): Quantile value for quantile loss, if used. Default is 0.5.
     '''
 
-    def __init__(self, criterion, lr, warmup):
+    def __init__(self):
         super().__init__()
-        self.criterion = Loss(criterion)
-        self.save_hyperparameters()
+        self.criterion = Loss(self.hparams.criterion)
 
     def setup(self, stage=None):
         if stage == 'fit' and self.trainer.datamodule:
@@ -231,12 +230,15 @@ class BaseModel(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.hparams.lr)
-        lr_scheduler = CosineWarmupScheduler(optimizer,
-                                             warmup=self.hparams.warmup,
-                                             max_iters=self.total_steps * self.trainer.max_epochs)
-        return [optimizer], [{'scheduler': lr_scheduler, 'interval': 'step'}]
+        if self.hparams.use_scheduler:
+            lr_scheduler = CosineWarmupScheduler(optimizer,
+                                                warmup=self.hparams.warmup,
+                                                max_iters=self.total_steps * self.trainer.max_epochs)
+            return [optimizer], [{'scheduler': lr_scheduler, 'interval': 'step'}]
+        return optimizer
 
-    
+
+
     def _calculate_loss(self, batch, mode="train"):
 
         inputs, _, label = batch

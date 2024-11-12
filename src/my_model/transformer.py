@@ -24,9 +24,9 @@ class TrackFormer(BaseModel):
     """
 
     def __init__(self, input_dim, model_dim, num_classes, num_heads, num_layers, criterion,
-                     warmup, lr, dropout=0.0, input_dropout=0.0):
-        super().__init__(criterion, warmup, lr)
-        self.save_hyperparameters(ignore=['_class_path'])
+                     warmup, lr, use_scheduler=True, dropout=0.0, input_dropout=0.0):
+        self.save_hyperparameters()
+        super().__init__()
         self._create_model()
 
 
