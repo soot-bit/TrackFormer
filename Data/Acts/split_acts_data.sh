@@ -1,13 +1,11 @@
 #!/bin/bash
 
-
 if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <dataset_dir> <train_percentage> <val_percentage> <test_percentage>"
     exit 1
 else
-   
     DATASET_DIR=$1
-    TRAIN_PERCENT=$2 
+    TRAIN_PERCENT=$2
     VAL_PERCENT=$3
     TEST_PERCENT=$4
 
@@ -18,48 +16,38 @@ else
     fi
 fi
 
-
-
-
-
+# Create directories
 mkdir -p train val test
 
-
-
-
-
-
-
+# Extract events
 EVENTS=$(ls "$DATASET_DIR" | grep -o 'event[0-9]\{9\}' | sort -u)
-
-# Check events
 if [ -z "$EVENTS" ]; then
-    echo "Error: No events found in the dataset directory."
+    echo "Error: dataset directory empty"
     exit 1
 fi
-
 
 EVENT_ARRAY=($EVENTS)
 total_events=${#EVENT_ARRAY[@]}
 
 train_count=$((total_events * TRAIN_PERCENT / 100))
-val_count=$((total_events * VAL_PERCENT / 100))  # split ratios
+val_count=$((total_events * VAL_PERCENT / 100))
 test_count=$((total_events - train_count - val_count))
 
 total_success=0
 total_files=$((total_events * 4)) # 4 files per event
 
-prev_dest_dir=""
 
-echo "Starting the copy process..."
+
+echo "Starting the spliting process..."
 echo "Total events to process: ${#EVENT_ARRAY[@]}"
 echo "Total expected files: $total_files"
 echo ""
 
+
 for i in "${!EVENT_ARRAY[@]}"; do
     event=${EVENT_ARRAY[$i]}
-    
-    # destination directory
+
+    # Destination directory
     if [ "$i" -lt "$train_count" ]; then
         dest_dir="train"
     elif [ "$i" -lt "$((train_count + val_count))" ]; then
@@ -68,22 +56,29 @@ for i in "${!EVENT_ARRAY[@]}"; do
         dest_dir="test"
     fi
 
-    # copy
+    
     for file_type in parameters particles spacepoint tracks; do
         src_file="$DATASET_DIR/$event-$file_type.csv"
         dest_file="$dest_dir/"
-        
-        cp "$src_file" "$dest_file" && ((total_success++))
-        #progess
-        printf "[%3d%%] \t Desitination: %s \t Copied: %s-%s.csv \r" $((total_success * 100 / total_files)) "$dest_dir" "$event"  "$file_type" 
+
+        if cp "$src_file" "$dest_file"; then
+            ((total_success++))
+        fi
+
+        # progress
+        progress=$((total_success * 100 / total_files))
+        echo -ne "\r[$progress%]  Destination: $dest_dir  Copied: $event-$file_type.csv"
     done
 done
 
-echo ""
-echo ""
 
+# Summary 
+echo ""
 echo "============================"
-echo "         Summary            "
+printf "%-20s | %-10s\n" "Category" "Count"
 echo "============================"
-echo "Total files copied: $total_success / $total_files" 
+printf "%-20s | %-10d\n" "Total Files Copied" "$total_success"
+printf "%-20s | %-10d\n" "Training Ratio" "$train_count"
+printf "%-20s | %-10d\n" "Validation Ratio" "$val_count"
+printf "%-20s | %-10d\n" "Testing Ratio" "$test_count"
 echo "============================"
