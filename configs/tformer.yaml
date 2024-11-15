@@ -44,15 +44,17 @@ model:
     num_layers: 2
     warmup: 100
     lr: 0.0002
-    dropout: 0.4
-    input_dropout: 0.4
+    dropout: 0.0
+    input_dropout: 0.0
     use_scheduler: False
     criterion: qloss-0.2
     
     ## Dataset
 data:
-  class_path: src.datasets.datamodules.ActsDataModule
+  class_path: src.datasets.datamodules.DataModule
   init_args:
-    batch_size: 1024
-    num_workers: 16
-    persistence: false
+    dataset_type: acts
+    dataset_dir: Data/Acts
+    batch_size: 32
+    use_wrapper: False
+    persistance: false

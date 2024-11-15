@@ -131,8 +131,8 @@ class IterBase(IterableDataset, ABC):
         folder (Path): directory containing dataset.
     """
 
-    def __init__(self, directory):
-        self.path = Path(directory) 
+    def __init__(self, dataset_dir, folder="train", dataset=None):
+        self.path = Path(dataset_dir) / folder 
         self.available_events = self._event_range()
     
     def _event_range(self):
@@ -148,12 +148,12 @@ class IterBase(IterableDataset, ABC):
     
     @abstractmethod
     def _preprocessor(self, event: str):
-        """Implement preprocessing logic."""
+        """preprocessing logic."""
         raise NotImplementedError
     
     @abstractmethod
     def _load_event(self, eventfiles):
-        """Implement loading logic."""
+        """loading logic."""
         raise NotImplementedError
 
     def __iter__(self):
@@ -174,41 +174,6 @@ class IterBase(IterableDataset, ABC):
             processed_data = self._preprocessor(event_files)
             yield processed_data
 
-class BaseDataModule(L.LightningDataModule):
-    """
-    A Base class for managing dataset loading and collating functionality.
-
-    """
-
-    def __init__(self):
-        super().__init__()
-       
-    def _create_dataloader(self, dataset):
-        """Helper function to initialize data loaders."""
-        return DataLoader(
-            dataset, 
-            batch_size=self.hparams.batch_size, 
-            num_workers=self.hparams.num_workers,
-            collate_fn=self.collate_fn,
-            persistent_workers=bool(self.hparams.num_workers) and self.hparams.persistance,
-            pin_memory=self.hparams.pin_memory
-        )
-    
-    def _create_dataset(self, split):
-        """Helper to initialize datasets"""
-        return self.dataset_class(self.hparams.dataset_dir, folder=split)
-    
-    def train_dataloader(self): return self._create_dataloader(self.train_dataset)
-    def val_dataloader(self): return self._create_dataloader(self.val_dataset)
-    def test_dataloader(self): return self._create_dataloader(self.test_dataset)
-
-    @staticmethod
-    def collate_fn(batch):
-        """Generic collate function for padding sequences."""
-        inputs, masks, targets = zip(*batch)
-        inputs = pad_sequence(inputs, batch_first=True)
-        masks = pad_sequence(masks, batch_first=True, padding_value=0)
-        return inputs, masks, torch.stack(targets, dim=0)
 
 
 
@@ -216,15 +181,12 @@ class BaseDataModule(L.LightningDataModule):
 
 
 
-########################################### TML dataset:
-
+########################################### streamline datasets:
 
 
 class TrackMLDataset(IterBase):
     """ Iterable class for TrackML"""
-    def __init__(self, dataset_dir, folder="train"):
-        self.split_path = Path(dataset_dir) / folder
-        super().__init__(self.split_path)
+
 
     def _load_event(self, event_prefix):
         self.event = event_prefix
@@ -261,86 +223,9 @@ class TrackMLDataset(IterBase):
 
 
 
-class TrackMLDatasetWrapper(Dataset):
-    """
-    Traditional torch dataloading from saved object
 
-    Attributes:
-        data_file (Path): Path to save/load preprocessed data.
-        dataset_dir (str or Path): Directory containing dataset.
-        folder (str):  (train, test, val) to load.
-    """
-
-    def __init__(self, dataset_dir, folder):
-        self.dataset_dir = Path(dataset_dir)
-        self.folder = folder
-        self.data_file = self.dataset_dir / f"preprocessed_{self.folder}.pt"  
-        self.datalist = [] 
-        self.__setup()
-
-    def __setup(self):
-        """Sets up the dataset by loading from preprocessed data if available, or processing and saving it."""
-        if self.data_file.is_file():
-            console.print(f"Loading data from {self.data_file}")
-            self.datalist = torch.load(self.data_file)  
-        else:
-            console.print("Preprocessed data not found. Processing and saving data...")
-            ds = TrackMLDataset(self.dataset_dir, self.folder)
-            ds_loader =  DataLoader(ds, num_workers=self.hparams.num_workers)
-            for data in ds_loader:
-                self.datalist.append(data)
-            torch.save(self.datalist, self.data_file)  
-            console.print(f"Data saved to {self.data_file}")
-
-    def __getitem__(self, index):
-        return self.datalist[index]
-
-    def __len__(self):
-        return len(self.datalist)
-
-
-
-class TrackMLDataModule(BaseDataModule):
-
-    """
-    Lightning DataModule for managing TrackML datasets
-    Args:
-        dataset_dir (Path): Path to the directory containing TrackML data. 
-            Defaults to "Data/Tml"  
-        use_wrapper (optional): If True, loads/creates preprocessed data, (very fast) 
-        batch_size
-        num_workers 
-    """
-
-    def __init__(self, dataset_dir=Path("Data/Tml"), batch_size=32, 
-                 num_workers=os.cpu_count() - 2, use_wrapper=True, 
-                 persistance=False, pin_memory=False):
-        self.save_hyperparameters(ignore=['_class_path'])
-        self.dataset_class = TrackMLDatasetWrapper if use_wrapper else TrackMLDataset
-        super().__init__()
-
-    def setup(self, stage=None):
-        console.rule("TrackML Dataset")
-        if stage in ('fit', None):
-            self.train_dataset = self._create_dataset("train")
-            self.val_dataset = self._create_dataset("val")
-
-        if stage in ('test', None):
-            self.test_dataset = self._create_dataset("test")
-
-
-
-
-
-########################## ACTS data:
 class ActsDataset(IterBase):
     
-    def __init__(self, directory, folder):
-        self.event = 0
-        ds_split = Path(directory) / folder
-        super().__init__(ds_split)
-        
-
     def _load_event(self, event_prefix):
         self.event = event_prefix
         parameters = self.path / f'{event_prefix}-parameters.csv'
@@ -366,33 +251,112 @@ class ActsDataset(IterBase):
         xyz = torch.tensor(spacepoints[["x", "y", "z"]].values, dtype=torch.float32)
         pt = torch.sqrt(torch.tensor(particles.px.values, dtype=torch.float32)**2 + 
                     torch.tensor(particles.py.values, dtype=torch.float32)**2)
-        
-        if pt.size(0) == 0:
-            return None
-        
+    
         return xyz, torch.ones(xyz.shape[0], dtype=torch.bool), pt
 
 
+class DatasetWrapper(Dataset):
+    """
+    Traditional torch dataloading from saved object.
 
-class ActsDataModule(BaseDataModule):
-    def __init__(
-        self,
-        dataset_dir = Path("Data/Acts"),
-        num_workers = os.cpu_count() - 2,
-        batch_size: int = 20,
-        persistence: bool = False,
-        pin_memory = True,
-        use_wrapper=False, 
-        persistance=True
-    ):
-        
-        self.save_hyperparameters(ignore=['_class_path'])
+    Attributes:
+        data_file (Path): Path to save/load preprocessed data.
+        dataset_dir (Path): Directory containing dataset.
+        folder (str): (train, test, val) to load.
+    """
+
+    def __init__(self, dataset_dir, folder, dataset="tml"):
+        self.dataset_dir = Path(dataset_dir)
+        self.dataset_type = dataset.lower()
+        self.folder = folder
+        self.data_file = self.dataset_dir / f"preprocessed_{self.folder}.pt"
+        self.datalist = []
+
+        if self.dataset_type.lower() == "tml":
+            self.ds_class = TrackMLDataset
+        elif self.dataset_type.lower() == "acts":
+            self.ds_class = ActsDataset
+        else:
+            raise ValueError(f"Invalid dataset type '{dataset}'. Expected 'tml' or 'acts'.")
+
+        self.__setup()
+
+    def __setup(self):
+        """Sets up the dataset by loading from preprocessed data if available, or processing and saving it."""
+        if self.data_file.is_file():
+            console.print(f"Loading data from {self.data_file}", style="cyan")
+            self.datalist = torch.load(self.data_file)
+        else:
+            console.print("Preprocessed data not found. Processing and saving data...", style="cyan")
+            ds = self.ds_class(self.dataset_dir, self.folder)
+            ds_loader = DataLoader(ds, num_workers=int(os.cpu_count()))
+            self.datalist = [data for data in ds_loader]
+            torch.save(self.datalist, self.data_file)
+            console.print(f"Data saved to {self.data_file}")
+
+    def __getitem__(self, index):
+        return self.datalist[index]
+
+    def __len__(self):
+        return len(self.datalist)
+
+
+class DataModule(L.LightningDataModule):
+    """
+    Lightning DataModule for managing TrackML or ACTS datasets.
+    Args:
+        dataset_type (str): Type of dataset ('tml' or 'acts').
+        dataset_dir (path): the path to where the dataset file is
+    """
+
+    def __init__(self, dataset_type, dataset_dir, batch_size=32, num_workers=os.cpu_count() - 2,
+                 use_wrapper=True, persistance=False, pin_memory=False):
         super().__init__()
-
+        self.save_hyperparameters(ignore=['_class_path'])
+        dataset = self.hparams.dataset_type.lower()
+        if dataset == "tml":
+            self.dataset_class = DatasetWrapper if use_wrapper else TrackMLDataset
+        elif dataset_type == "acts":
+            self.dataset_class = DatasetWrapper if use_wrapper else ActsDataset
+        else:
+            raise ValueError(f"Invalid dataset_type '{dataset}'. Expected 'tml' or 'acts'.")
 
     def setup(self, stage=None):
-        console.rule("ACTS Streamlined Preprocessing")
-        self.train_dataset = ActsDataset(self.hparams.dataset_dir, folder = "train", )
-        self.val_dataset = ActsDataset(self.hparams.dataset_dir, folder = "val")
-        self.test_dataset = ActsDataset(self.hparams.dataset_dir, folder = "test")
+        """Setup datasets for training, validation, and testing."""
+        console.rule(f"{self.hparams.dataset_type.capitalize()} Dataset")
+
+        if stage in ('fit', None):
+            self.train_dataset = self._create_dataset("train")
+            self.val_dataset = self._create_dataset("val")
+
+        if stage in ('test', None):
+            self.test_dataset = self._create_dataset("test")
+
     
+    def train_dataloader(self): return self._create_dataloader(self.train_dataset)
+    def val_dataloader(self): return self._create_dataloader(self.val_dataset)
+    def test_dataloader(self): return self._create_dataloader(self.test_dataset)
+
+    def _create_dataloader(self, dataset):
+        """Helper function to initialize data loaders."""
+        return DataLoader(
+            dataset, 
+            batch_size=self.hparams.batch_size, 
+            num_workers=self.hparams.num_workers,
+            collate_fn=self.collate_fn,
+            persistent_workers=bool(self.hparams.num_workers) and self.hparams.persistance,
+            pin_memory=self.hparams.pin_memory
+        )
+    
+    def _create_dataset(self, folder):
+        """Helper method to create dataset for the given folder"""
+        return self.dataset_class(dataset_dir=self.hparams.dataset_dir, folder=folder, dataset=self.hparams.dataset_type)
+
+    
+    @staticmethod
+    def collate_fn(batch):
+        """Generic collate function for padding sequences."""
+        inputs, masks, targets = zip(*batch)
+        inputs = pad_sequence(inputs, batch_first=True)
+        masks = pad_sequence(masks, batch_first=True, padding_value=0)
+        return inputs, masks, torch.stack(targets, dim=0)
