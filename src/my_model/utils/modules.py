@@ -245,7 +245,8 @@ class BaseModel(L.LightningModule):
 
         preds = self(inputs)
         loss = self.criterion(preds.squeeze(), label.squeeze())
-        self.log(f"{mode}_loss", loss, prog_bar=True, logger=True, batch_size=inputs.shape[0] )
+        self.log(f"{mode}_loss", loss, prog_bar=True, logger=False, batch_size=inputs.shape[0] )
+        self.logger.experiment.add_scalars('loss', {mode: loss}, self.global_step)
         return loss
 
     def training_step(self, batch, batch_idx):
