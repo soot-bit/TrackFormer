@@ -1,8 +1,8 @@
 # lightning.pytorch==2.4.0
 seed_everything: 0
 trainer:
-  max_epochs: 4
-  overfit_batches: 0.0
+  max_epochs: 5
+  overfit_batches: 1
   check_val_every_n_epoch: 1
   log_every_n_steps: 1
   num_nodes: 1
@@ -12,7 +12,7 @@ trainer:
       init_args: 
         save_dir: Data/Tb
         default_hp_metric: false
-        name: test-qloss ## same name
+        name: test-ovwefitting ## same name
   callbacks:
     - class_path: lightning.pytorch.callbacks.Timer
       init_args:
@@ -47,15 +47,15 @@ model:
     num_layers: 2
     warmup: 100
     lr: 0.0002
-    dropout: 0.4
-    input_dropout: 0.4
-    use_scheduler: True
+    dropout: 0.0
+    input_dropout: 0.0
+    use_scheduler: False
     criterion: qloss-0.2
     
     ## Dataset
 data:
   class_path: src.datasets.datamodules.ActsDataModule
   init_args:
-    batch_size: 128
-    num_workers: 16
+    batch_size: 1
+    num_workers: 0
     persistence: false
