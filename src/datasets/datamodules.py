@@ -172,8 +172,6 @@ class IterBase(IterableDataset, ABC):
         for i in range(iter_start, iter_end):
             event_files = self._load_event(self.available_events[i])
             processed_data = self._preprocessor(event_files)
-            if processed_data is None:
-                continue
             yield processed_data
 
 class BaseDataModule(L.LightningDataModule):
