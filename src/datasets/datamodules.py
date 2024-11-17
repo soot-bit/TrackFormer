@@ -248,11 +248,10 @@ class ActsDataset(IterBase):
         spacepoints, _, particles, _ = event_files
         
         # Convert to a tensor
-        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values, dtype=torch.float32)
+        xyz = torch.tensor(spacepoints[["x", "y", "z"]].values, dtype=torch.float32).squeeze()
         pt = torch.sqrt(torch.tensor(particles.px.values, dtype=torch.float32)**2 + 
-                    torch.tensor(particles.py.values, dtype=torch.float32)**2)
-    
-        return xyz, torch.ones(xyz.shape[0], dtype=torch.bool), pt
+                    torch.tensor(particles.py.values, dtype=torch.float32)**2).squeeze()
+        return xyz, torch.ones(xyz.shape[0], dtype=torch.bool) , pt
 
 
 class DatasetWrapper(Dataset):
@@ -270,11 +269,11 @@ class DatasetWrapper(Dataset):
         self.dataset_type = dataset.lower()
         self.folder = folder
         self.data_file = self.dataset_dir / f"preprocessed_{self.folder}.pt"
-        self.datalist = []
+        self.datalist = None
 
-        if self.dataset_type.lower() == "tml":
+        if self.dataset_type == "tml":
             self.ds_class = TrackMLDataset
-        elif self.dataset_type.lower() == "acts":
+        elif self.dataset_type == "acts":
             self.ds_class = ActsDataset
         else:
             raise ValueError(f"Invalid dataset type '{dataset}'. Expected 'tml' or 'acts'.")
@@ -290,7 +289,7 @@ class DatasetWrapper(Dataset):
             console.print("Preprocessed data not found. Processing and saving data...", style="cyan")
             ds = self.ds_class(self.dataset_dir, self.folder)
             ds_loader = DataLoader(ds, num_workers=int(os.cpu_count()))
-            self.datalist = [data for data in ds_loader]
+            self.datalist = [[x.squeeze(), y.squeeze(), z.squeeze()] for x,y,z in ds_loader]
             torch.save(self.datalist, self.data_file)
             console.print(f"Data saved to {self.data_file}")
 
