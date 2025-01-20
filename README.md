@@ -22,7 +22,8 @@ TrackFormer is a unique solution to particle trajectory reconstruction that uses
 2. download datasets to specific directory
 3. cd to appropriate script to train, test split dataset: 
  `./split_dataset.sh /path/to/downloaded/dataset 80 10 10`
-4. example usage `python main.py fit --config configs/tformer.yaml  --data ActsDataModule  --config configs/trainer.yaml`
+4. train the model using the following command:
+ `python main.py fit --config configs/tformer.yaml`
 
 ## Important links
 
