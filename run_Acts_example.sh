@@ -1,0 +1,1 @@
+python main.py fit --config configs/Acts/trainer.yaml --config configs/Acts/q_model.yaml  --config configs/Acts/dataset.yaml 
