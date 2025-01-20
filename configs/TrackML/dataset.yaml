@@ -1,0 +1,11 @@
+# lightning.pytorch==2.4.0
+seed_everything: 0
+## Dataset
+data:
+  class_path: src.datasets.datamodules.DataModule
+  init_args:
+    dataset_type: tml
+    dataset_dir: Data/Tml
+    batch_size: 256
+    use_wrapper: True
+    persistance: True
