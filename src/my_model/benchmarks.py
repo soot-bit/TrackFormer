@@ -15,6 +15,7 @@ import torch
 from scipy.optimize import least_squares
 import numba
 
+
 class CircleFit:
     """
     Least squares Circle fit for ToyTrack.
@@ -23,7 +24,7 @@ class CircleFit:
         params (list): List of parameters (cx, cy, r) for each fitted circle. None if not fitted yet.
         data (list): List of xy_batch data points from a torch dataloader
     """
-    
+
     def __init__(self):
         self.params = None
         self.data = None
@@ -32,7 +33,7 @@ class CircleFit:
     @numba.jit(nopython=True)
     def _residuals(p, xy):
         cx, cy, r = p
-        return np.sqrt((xy[:, 0] - cx)**2 + (xy[:, 1] - cy)**2) - r
+        return np.sqrt((xy[:, 0] - cx) ** 2 + (xy[:, 1] - cy) ** 2) - r
 
     def fit(self, xy_batch):
         self.data = xy_batch
@@ -40,7 +41,11 @@ class CircleFit:
         for xy in xy_batch:
             xy = xy.numpy()
             x, y = xy[:, 0], xy[:, 1]
-            init = [x.mean(), y.mean(), np.sqrt((x - x.mean())**2 + (y - y.mean())**2).mean()]
+            init = [
+                x.mean(),
+                y.mean(),
+                np.sqrt((x - x.mean()) ** 2 + (y - y.mean()) ** 2).mean(),
+            ]
             self.params.append(least_squares(CircleFit._residuals, init, args=(xy,)).x)
 
         return torch.tensor(self.params)[:, -1]
@@ -56,24 +61,32 @@ class CircleFit:
         for idx in picks:
             xy = self.data[idx]
             cx, cy, r = self.params[idx]
-            ax.plot(xy[:, 0], xy[:, 1], 'o', label=f'Batch {idx + 1}')
-            ax.add_artist(plt.Circle((cx, cy), r, fill=False, linestyle='--', label=f'Track {idx + 1} (Pt={r:.2f})'))
+            ax.plot(xy[:, 0], xy[:, 1], "o", label=f"Batch {idx + 1}")
+            ax.add_artist(
+                plt.Circle(
+                    (cx, cy),
+                    r,
+                    fill=False,
+                    linestyle="--",
+                    label=f"Track {idx + 1} (Pt={r:.2f})",
+                )
+            )
 
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_title(f'Circle Fitting for {n_plots} Batches')
-        ax.set_aspect('equal', 'box')
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_title(f"Circle Fitting for {n_plots} Batches")
+        ax.set_aspect("equal", "box")
         ax.legend()
         ax.grid(True)
         plt.show()
 
 
-
 ##################################################################:
 
-                            ###################################
-                            #       Neural Networks           #
-                            ###################################
+###################################
+#       Neural Networks           #
+###################################
+
 
 class ComplexNet(nn.Module):
     def __init__(self, input_size=20, output_size=1, hidden_layers=(128, 64, 32)):
@@ -82,10 +95,7 @@ class ComplexNet(nn.Module):
         layers = []
         prev_size = input_size
         for hidden_size in hidden_layers:
-            layers.extend([
-                nn.Linear(prev_size, hidden_size),
-                nn.ReLU()
-            ])
+            layers.extend([nn.Linear(prev_size, hidden_size), nn.ReLU()])
             prev_size = hidden_size
 
         # Output layer
@@ -98,26 +108,16 @@ class ComplexNet(nn.Module):
         x = self.model(x)
         return x
 
+
 class NeuralFit(BaseModel):
     def __init__(self, criterion, lr, max_iters, warmup, **kwargs):
         super().__init__(criterion, lr, max_iters, warmup)
         self.save_hyperparameters()
         self.model = ComplexNet(**kwargs)
 
-
     def forward(self, x):
         preds = self.model(x)
         return preds
-
-
-
-
-
-
-
-
-
-
 
 
 # # Initialize lists to store the MAE values
@@ -154,10 +154,6 @@ class NeuralFit(BaseModel):
 #             pt_conf_mae_list.append(pt_conf_mae.item())
 
 
-
-
-
-
 # # Convert lists to numpy arrays
 # m_transf_mae_pt = np.array(m_transf_mae_pt)
 # # q_transf_mae_pt = np.array(q_transf_mae_pt)
@@ -188,8 +184,6 @@ class NeuralFit(BaseModel):
 # print(f"Conformal MAE: {pt_conf_mean:.4f} ± {pt_conf_delta:.4f}")
 
 
-
-
 def view_trajectory(inputs, mask=None):
     """
     Plots the trajectory of a particle in 3D.
@@ -201,20 +195,22 @@ def view_trajectory(inputs, mask=None):
     y = inputs[:, 1].numpy()
     z = inputs[:, 2].numpy()
 
-    fig = go.Figure(data=[go.Scatter3d(
-        x=x, y=y, z=z,
-        mode='lines+markers',
-        marker=dict(size=4, color='blue', opacity=0.8),
-        line=dict(color='blue', width=2)
-    )])
+    fig = go.Figure(
+        data=[
+            go.Scatter3d(
+                x=x,
+                y=y,
+                z=z,
+                mode="lines+markers",
+                marker=dict(size=4, color="blue", opacity=0.8),
+                line=dict(color="blue", width=2),
+            )
+        ]
+    )
 
     fig.update_layout(
-        scene=dict(
-            xaxis_title='X',
-            yaxis_title='Y',
-            zaxis_title='Z'
-        ),
-        title='Particle Trajectory'
+        scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z"),
+        title="Particle Trajectory",
     )
 
     fig.show()

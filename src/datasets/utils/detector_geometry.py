@@ -5,11 +5,10 @@ from typing import Union, Tuple, Optional, List
 from .particle_gun import ParticleGun
 
 
-
 class Hit:
     """
     A class that represents a hit.
-    
+
     Parameters
     ----------
     x: float
@@ -26,7 +25,16 @@ class Hit:
     module: int
     """
 
-    def __init__(self, x: float = None, y: float = None, z: float = None, r: float = None, phi: float = None, layer: int = None, module: int = None):
+    def __init__(
+        self,
+        x: float = None,
+        y: float = None,
+        z: float = None,
+        r: float = None,
+        phi: float = None,
+        layer: int = None,
+        module: int = None,
+    ):
         """
         Initialize the Hit with the given parameters.
         The coordinates can be either cartesian (x, y, z) or cylindrical (r, phi, z).
@@ -36,7 +44,7 @@ class Hit:
             self.x = x
             self.y = y
             self.z = z
-            self.r = (x**2 + y**2)**0.5
+            self.r = (x**2 + y**2) ** 0.5
             self.phi = np.arctan2(y, x)
         elif r is not None and phi is not None and z is not None:
             self.r = r
@@ -45,7 +53,9 @@ class Hit:
             self.x = r * np.cos(phi)
             self.y = r * np.sin(phi)
         else:
-            raise ValueError("Either cartesian (x, y, z) or cylindrical (r, phi, z) coordinates must be provided.")
+            raise ValueError(
+                "Either cartesian (x, y, z) or cylindrical (r, phi, z) coordinates must be provided."
+            )
         self.layer = layer
         self.module = module
 
@@ -67,7 +77,7 @@ class Detector:
     layer_spacing: float
         The spacing between layers of the detector.
     number_of_layers: int
-        The number of layers in the detector.      
+        The number of layers in the detector.
     hole_inefficiency: int, float
         If specified: If a float, then this is the inefficiency of each layer - i.e. the
         probability that a hit will not be recorded. If an int, then this is the number of
@@ -86,48 +96,65 @@ class Detector:
         """
         Add a detector from a template.
         """
-        if template == 'barrel':
+        if template == "barrel":
             self.add_barrel(**kwargs)
-        elif template == 'endcap':
+        elif template == "endcap":
             self.add_endcap(**kwargs)
         else:
             raise ValueError("Template must be 'barrel' or 'endcap'.")
 
         return self
 
-    def add_barrel(self, min_radius: float, max_radius: float, number_of_layers: int, length: float = None):
+    def add_barrel(
+        self,
+        min_radius: float,
+        max_radius: float,
+        number_of_layers: int,
+        length: float = None,
+    ):
         """
         Add a barrel detector. Layers are spaced evenly between min_radius and max_radius.
         """
-        
+
         barrel_layers = []
         radius_spacing = (max_radius - min_radius) / (number_of_layers - 1)
         for layer in range(number_of_layers):
             layer_radius = min_radius + layer * radius_spacing
-            barrel_layers.append({
-                'shape': 'cylinder',
-                'radius': layer_radius,
-                'length': length,
-            })
+            barrel_layers.append(
+                {
+                    "shape": "cylinder",
+                    "radius": layer_radius,
+                    "length": length,
+                }
+            )
 
         self.layers.extend(barrel_layers)
 
-    def add_endcap(self, min_radius: float, max_radius: float, min_z, max_z, layer_spacing: float, number_of_layers: int):
+    def add_endcap(
+        self,
+        min_radius: float,
+        max_radius: float,
+        min_z,
+        max_z,
+        layer_spacing: float,
+        number_of_layers: int,
+    ):
         """
         Add an endcap detector. This is a series of annuli, evenly spaced in z.
         """
         endcap_layers = []
         for layer in range(number_of_layers):
             z = min_z + layer * layer_spacing
-            endcap_layers.append({
-                'shape': 'annulus',
-                'min_radius': min_radius,
-                'max_radius': max_radius,
-                'z': z,
-            })           
+            endcap_layers.append(
+                {
+                    "shape": "annulus",
+                    "min_radius": min_radius,
+                    "max_radius": max_radius,
+                    "z": z,
+                }
+            )
 
         self.layers.extend(endcap_layers)
-        
 
     def generate_hits(self, particles: pd.DataFrame) -> pd.DataFrame:
         """
@@ -163,7 +190,7 @@ class Detector:
         layer_indices = np.random.randint(0, len(self.layers), num_noise)
 
         # Create a lookup array for the radii of the layers
-        radii = np.array([layer['radius'] for layer in self.layers])
+        radii = np.array([layer["radius"] for layer in self.layers])
 
         # Get the radius of the selected layer for each noise hit
         r = radii[layer_indices]
@@ -173,18 +200,19 @@ class Detector:
         y = r * np.sin(phi)
 
         # Create a DataFrame of the noise hits
-        noise_df = pd.DataFrame({
-            'x': x,
-            'y': y,
-            'particle_id': -1,
-        })
+        noise_df = pd.DataFrame(
+            {
+                "x": x,
+                "y": y,
+                "particle_id": -1,
+            }
+        )
 
         # Mix together hits and noise randomly
         hits_df = pd.concat([hits_df, noise_df]).reset_index(drop=True)
 
         return hits_df
 
-    
     def _generate_hits(self, particles: pd.DataFrame) -> pd.DataFrame:
         """
         Helper method to generate a list of hits based on the given particle.
@@ -194,7 +222,7 @@ class Detector:
 
         # Reset the index on the hits
         hits.reset_index(drop=True, inplace=True)
-        
+
         return hits
 
     def _generate_holes(self, hits_df: pd.DataFrame) -> pd.DataFrame:
@@ -208,7 +236,7 @@ class Detector:
             hits_df = self._generate_holes_deterministic(hits_df)
 
         return hits_df
-    
+
     def _generate_holes_probabilistic(self, hits_df: pd.DataFrame) -> pd.DataFrame:
         """
         Each hit is given a random number between 0 and 1. If this number is less than the hole inefficiency,
@@ -218,15 +246,17 @@ class Detector:
         hits_df = hits_df[random_hole_probability > self.hole_inefficiency]
 
         return hits_df
-    
+
     def _generate_holes_deterministic(self, hits_df: pd.DataFrame) -> pd.DataFrame:
         """
         For each particle, remove a random number of hits equal to the hole inefficiency.
         """
 
         # Remove a random number of hits for each particle
-        holes = hits_df.groupby('particle_id').sample(n=self.hole_inefficiency, random_state=42)
-        
+        holes = hits_df.groupby("particle_id").sample(
+            n=self.hole_inefficiency, random_state=42
+        )
+
         if self.hole_inefficiency > 1:
             holes = holes.droplevel(0)
 
@@ -234,7 +264,7 @@ class Detector:
         hits_df = hits_df.drop(holes.index)
 
         return hits_df
-    
+
     def _calculate_intersection_points(self, particles: pd.DataFrame) -> pd.DataFrame:
         """
         Helper method to calculate the intersection points of the particle trajectory with the detector.
@@ -248,34 +278,44 @@ class Detector:
             raise ValueError("Dimension must be 2 or 3.")
 
         return intersection_points
-    
-    def _calculate_intersection_points_2d(self, particles: pd.DataFrame) -> pd.DataFrame:
+
+    def _calculate_intersection_points_2d(
+        self, particles: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Helper method to calculate the intersection points of the particle trajectory with the detector in 2D.
         """
         # Calculate the intersection points of the particle trajectory with the detector
         intersection_points = []
-        intersection_points.append(self._calculate_intersection_points_2d_cylinder(particles))
-        
+        intersection_points.append(
+            self._calculate_intersection_points_2d_cylinder(particles)
+        )
+
         intersection_points = pd.concat(intersection_points)
 
         return intersection_points
 
-    def _calculate_intersection_points_3d(self, particles: pd.DataFrame) -> List[Tuple[float, float, float]]:
+    def _calculate_intersection_points_3d(
+        self, particles: pd.DataFrame
+    ) -> List[Tuple[float, float, float]]:
         raise NotImplementedError("3D intersection points not implemented yet.")
-    
-    def _calculate_intersection_points_2d_plane(self, particles: pd.DataFrame) -> List[Tuple[float, float, float]]:
+
+    def _calculate_intersection_points_2d_plane(
+        self, particles: pd.DataFrame
+    ) -> List[Tuple[float, float, float]]:
         raise NotImplementedError("2D plane intersection points not implemented yet.")
-    
-    def _calculate_intersection_points_2d_cylinder(self, particles_df: pd.DataFrame) -> List[Tuple[float, float, float]]:
+
+    def _calculate_intersection_points_2d_cylinder(
+        self, particles_df: pd.DataFrame
+    ) -> List[Tuple[float, float, float]]:
         """
         Helper method to calculate the intersection points of the particle trajectory with the detector in 2D.
         """
         layers_df = pd.DataFrame(self.layers)
         # Narrow to only the layers that are cylinders
-        layers_df = layers_df[layers_df['shape'] == 'cylinder']
+        layers_df = layers_df[layers_df["shape"] == "cylinder"]
 
-        particle_layer_pairs = pd.merge(particles_df, layers_df, how='cross')
+        particle_layer_pairs = pd.merge(particles_df, layers_df, how="cross")
 
         # Find intersections
         self._find_intersections_df(particle_layer_pairs)
@@ -283,55 +323,80 @@ class Detector:
         # Filter valid intersections
         self._filter_points_on_segment_df(particle_layer_pairs)
 
-        hits = pd.concat([
-            particle_layer_pairs[particle_layer_pairs['valid1']][['x1', 'y1', 'particle_id']].rename(columns={'x1': 'x', 'y1': 'y'}),
-            particle_layer_pairs[particle_layer_pairs['valid2']][['x2', 'y2', 'particle_id']].rename(columns={'x2': 'x', 'y2': 'y'}),
-        ])
+        hits = pd.concat(
+            [
+                particle_layer_pairs[particle_layer_pairs["valid1"]][
+                    ["x1", "y1", "particle_id"]
+                ].rename(columns={"x1": "x", "y1": "y"}),
+                particle_layer_pairs[particle_layer_pairs["valid2"]][
+                    ["x2", "y2", "particle_id"]
+                ].rename(columns={"x2": "x", "y2": "y"}),
+            ]
+        )
 
         return hits
 
     def _find_intersections_df(self, df):
-        r = df['pt']
-        x0 = df['vx'] - df['charge'] * r * np.cos(df['pphi'])
-        y0 = df['vy'] - df['charge'] * r * np.sin(df['pphi'])
+        r = df["pt"]
+        x0 = df["vx"] - df["charge"] * r * np.cos(df["pphi"])
+        y0 = df["vy"] - df["charge"] * r * np.sin(df["pphi"])
 
         # distance between circles R
         R = np.hypot(x0, y0)
 
-        a = (r**2 - df['radius']**2) / (2 * R)
-        b1 = np.sqrt(np.clip(
-            (r**2 + df['radius']**2) / 2 - 
-            (r**2 - df['radius']**2) **2 / (4 * R**2) -
-            R ** 2 / 4
-        , 0, None))
+        a = (r**2 - df["radius"] ** 2) / (2 * R)
+        b1 = np.sqrt(
+            np.clip(
+                (r**2 + df["radius"] ** 2) / 2
+                - (r**2 - df["radius"] ** 2) ** 2 / (4 * R**2)
+                - R**2 / 4,
+                0,
+                None,
+            )
+        )
         b2 = -b1
 
         # Calculate the intersection points
-        x1 = x0/2 - a * x0/R + b1 * y0/R
-        y1 = y0/2 - a * y0/R - b1 * x0/R
-        x2 = x0/2 - a * x0/R + b2 * y0/R
-        y2 = y0/2 - a * y0/R - b2 * x0/R
+        x1 = x0 / 2 - a * x0 / R + b1 * y0 / R
+        y1 = y0 / 2 - a * y0 / R - b1 * x0 / R
+        x2 = x0 / 2 - a * x0 / R + b2 * y0 / R
+        y2 = y0 / 2 - a * y0 / R - b2 * x0 / R
 
-        df["x0"], df["y0"], df["x1"], df["y1"], df["x2"], df["y2"] = x0, y0, x1, y1, x2, y2
+        df["x0"], df["y0"], df["x1"], df["y1"], df["x2"], df["y2"] = (
+            x0,
+            y0,
+            x1,
+            y1,
+            x2,
+            y2,
+        )
 
     def _filter_points_on_segment_df(self, df):
         """
-        A vectorized version of the above loop. Takes a list of 
+        A vectorized version of the above loop. Takes a list of
         (x1, y1), (x2, y2) and creates two new columns, with a
         true or false entry for each point.
         """
-    
+
         # Calculate the angle of the intersection point relative to the trajectory's starting point
-        angle1 = np.arctan2(df['y1'] - df['y0'], df['x1'] - df['x0'])
-        angle2 = np.arctan2(df['y2'] - df['y0'], df['x2'] - df['x0'])
+        angle1 = np.arctan2(df["y1"] - df["y0"], df["x1"] - df["x0"])
+        angle2 = np.arctan2(df["y2"] - df["y0"], df["x2"] - df["x0"])
 
         # Adjust the angle based on the charge
-        lower_bound = np.where(df['charge'] == -1, df['pphi'] + np.pi - np.pi/2, df['pphi'])
-        upper_bound = np.where(df['charge'] == -1, df['pphi'] + np.pi, df['pphi'] + np.pi/2)
+        lower_bound = np.where(
+            df["charge"] == -1, df["pphi"] + np.pi - np.pi / 2, df["pphi"]
+        )
+        upper_bound = np.where(
+            df["charge"] == -1, df["pphi"] + np.pi, df["pphi"] + np.pi / 2
+        )
 
         # Check if the angle falls within the delta_theta range
-        df['valid1'] = ((lower_bound <= angle1) & (angle1 <= upper_bound)) | ((lower_bound <= angle1 + 2*np.pi) & (angle1 + 2*np.pi <= upper_bound))
-        df['valid2'] = ((lower_bound <= angle2) & (angle2 <= upper_bound)) | ((lower_bound <= angle2 + 2*np.pi) & (angle2 + 2*np.pi <= upper_bound))
+        df["valid1"] = ((lower_bound <= angle1) & (angle1 <= upper_bound)) | (
+            (lower_bound <= angle1 + 2 * np.pi) & (angle1 + 2 * np.pi <= upper_bound)
+        )
+        df["valid2"] = ((lower_bound <= angle2) & (angle2 <= upper_bound)) | (
+            (lower_bound <= angle2 + 2 * np.pi) & (angle2 + 2 * np.pi <= upper_bound)
+        )
 
     def __repr__(self):
         return f"Detector(dimension={self.dimension}), layers: {self.layers}"

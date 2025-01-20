@@ -1,4 +1,4 @@
-import src.my_model.transformer  
+import src.my_model.transformer
 import src.my_model.benchmarks
 import src.datasets.datamodules
 import src.utils
