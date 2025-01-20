@@ -24,6 +24,8 @@ TrackFormer is a unique solution to particle trajectory reconstruction that uses
  `./split_dataset.sh /path/to/downloaded/dataset 80 10 10`
 4. train the model using the following command:
  `python main.py fit --config configs/tformer.yaml`
+5. train the model with wandb logging:
+ `python main.py fit --config configs/tformer.yaml --config configs/trainer.yaml`
 
 ## Important links
 
