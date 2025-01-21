@@ -175,7 +175,7 @@ class IterBase(IterableDataset, ABC):
         for i in range(iter_start, iter_end):
             event_files = self._load_event(self.available_events[i])
             processed_data = self._preprocessor(event_files)
-            yield processed_data
+            yield from processed_data
 
 
 ########################################### streamline datasets:
@@ -216,7 +216,7 @@ class TrackMLDataset(IterBase):
             target_tensor = torch.tensor(target, dtype=torch.float32)
 
             mask = torch.ones(zxy.shape[0], dtype=torch.bool)
-            return zxy, mask, target_tensor
+            yield zxy, mask, target_tensor
 
 
 class ActsDataset(IterBase):
@@ -251,7 +251,7 @@ class ActsDataset(IterBase):
             torch.tensor(particles.px.values, dtype=torch.float32) ** 2
             + torch.tensor(particles.py.values, dtype=torch.float32) ** 2
         ).squeeze()
-        return xyz, torch.ones(xyz.shape[0], dtype=torch.bool), pt
+        yield xyz, torch.ones(xyz.shape[0], dtype=torch.bool), pt
 
 
 class DatasetWrapper(Dataset):
