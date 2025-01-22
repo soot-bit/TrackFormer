@@ -13,5 +13,5 @@ model:
     lr: 0.0005
     dropout: 0.0
     input_dropout: 0.0
-    criterion: qloss-0.2
+    criterion: qloss-0.5
     use_scheduler: False
