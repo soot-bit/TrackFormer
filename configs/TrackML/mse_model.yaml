@@ -10,7 +10,8 @@ model:
     num_heads: 4
     num_layers: 2
     warmup: 100
-    lr: 0.0002
+    lr: 0.0005
     dropout: 0.1
     input_dropout: 0.1
     criterion: mse
+    use_scheduler: True
