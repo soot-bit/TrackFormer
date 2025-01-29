@@ -27,6 +27,46 @@ TrackFormer is a unique solution to particle trajectory reconstruction that uses
 5. train the model with wandb logging:
  `python main.py fit --config configs/tformer.yaml --config configs/trainer.yaml`
 
+## Reproducing the results
+
+To reproduce the results, you can use the following commands.
+
+Step 1: Clone the repository
+
+```bash
+git clone https://github.com/soot-bit/TrackFormer.git
+```
+
+Step 2: Create an environment using conda and install the dependencies
+
+```bash
+conda create --name TrackFormer python=3.10 
+conda activate TrackFormer
+pip install -r requirements.txt
+```
+
+Step 3: Download `train_1.zip` from the [TrackML dataset](https://www.kaggle.com/c/trackml-particle-identification/data) and extract it to the `Data` directory.
+
+```bash
+unzip train_1.zip -d Data/Tml/train_1
+```
+
+Step 4: Split the dataset into train, validation, and test sets
+
+```bash
+cd Data/Tml
+bash split_tml_inplace.sh train_1 80 10 10
+cd ../..
+```
+
+Step 5: Train the models
+
+```bash
+bash run_TrackML_example.sh
+```
+
+Step 6: To evaluate the models, update model paths in the `dataanalysis.ipynb` cells and run the notebook.
+
 ## Important links
 
 - [slides](https://docs.google.com/presentation/d/1YvFFSKoVI4W0tpCQEvG8J3SybidqZtn08r3DU9UGw_E/edit?usp=sharing)
