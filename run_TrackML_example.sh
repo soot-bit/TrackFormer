@@ -1,0 +1,2 @@
+python main.py fit --config configs/TrackML/trainer.yaml --config configs/TrackML/q_model.yaml  --config configs/TrackML/dataset.yaml 
+python main.py fit --config configs/TrackML/trainer.yaml --config configs/TrackML/mse_model.yaml  --config configs/TrackML/dataset.yaml 

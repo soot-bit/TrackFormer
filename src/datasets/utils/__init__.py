@@ -4,8 +4,8 @@ from .event_generator import EventGenerator
 from .particle_gun import ParticleGun
 
 __all__ = [
-    'Detector',
-    'Event',
-    'EventGenerator',
-    'ParticleGun',
+    "Detector",
+    "Event",
+    "EventGenerator",
+    "ParticleGun",
 ]

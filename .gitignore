@@ -6,3 +6,4 @@ notebooks
 trackml-library/
 acts.py
 wandb
+Results/
