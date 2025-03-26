@@ -7,3 +7,4 @@ trackml-library/
 acts.py
 wandb
 Results/
+.vscode
